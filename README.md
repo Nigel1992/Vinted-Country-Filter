@@ -30,7 +30,7 @@
    - [Violentmonkey](https://violentmonkey.github.io/) (Chrome, Firefox, Edge)
    - [Greasemonkey](https://www.greasespot.net/) (Firefox)
 
-2. **[Click here to install the script](https://greasyfork.org/en/users/1550823-nigel1992)** from Greasy Fork
+2. **[Click here to install the script](https://greasyfork.org/en/scripts/559753-vinted-country-city-filter-client-side)** from Greasy Fork
 
    *Or* create a new script and paste the contents of `code.js`
 
@@ -47,7 +47,7 @@
 ## ⚠️ Important Notes
 
 - **Language**: Set Vinted to **English** for the script to work correctly
-- **Rate Limits**: The script respects Vinted's API limits. If you see a captcha warning, solve it manually and processing will resume
+- **Rate Limits**: The script respects Vinted's API limits. If you see a captcha warning, solve it manually and processing will resume after confirming captcha solve.
 - **Visual Only**: Filtering is purely visual — it doesn't affect Vinted's search results
 
 ## 🔒 Privacy & Security
