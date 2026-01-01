@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.1.2
+// @version      1.1.3
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by item location. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -17,6 +17,27 @@
 
 (function () {
     'use strict';
+
+    /* =========================
+       Page Filter - Only run on homepage and catalog pages
+    ========================== */
+
+    function isAllowedPage() {
+        const path = location.pathname;
+        // Allow: homepage ("/"), catalog pages ("/catalog/..."), and search results
+        return path === '/' || 
+               path.startsWith('/catalog') || 
+               path.startsWith('/vetements') ||  // French catalog
+               path.startsWith('/kleding') ||    // Dutch catalog
+               path.startsWith('/ropa') ||       // Spanish catalog
+               path.startsWith('/abbigliamento') || // Italian catalog
+               path.startsWith('/kleidung');     // German catalog
+    }
+
+    // Exit early if not on an allowed page
+    if (!isAllowedPage()) {
+        return;
+    }
 
     /*
     USER INFORMATION (Greasy Fork transparency):
