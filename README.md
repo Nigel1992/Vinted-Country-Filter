@@ -51,7 +51,7 @@
 ## ⚠️ Important Notes
 
 - **Language**: Set Vinted to **English** for the script to work correctly
-- **Rate Limits**: The script respects Vinted's API limits. If you see a captcha warning, solve it manually and processing will resume after confirming captcha solve.
+- **Rate Limits**: The script respects Vinted's API limits.
 - **Visual Only**: Filtering is purely visual — it doesn't affect Vinted's search results
 
 ## 🔒 Privacy & Security
