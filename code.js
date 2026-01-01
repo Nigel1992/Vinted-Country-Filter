@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.1.3
+// @version      1.1.4
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by item location. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -59,6 +59,8 @@
     let selectedCountry = sessionStorage.getItem('vinted_filter_country') || '';
     let isProcessing = false;
     let isPausedForCaptcha = false;
+    let captchaPopup = null;
+    let captchaCheckInterval = null;
     let isWaitingForEnglish = false;
     let englishCheckComplete = false;
 
@@ -76,6 +78,85 @@
         poland: '🇵🇱',
         uk: '🇬🇧'
     };
+
+    /* =========================
+       Auto Captcha Solver
+    ========================== */
+
+    function openCaptchaPopup() {
+        const apiUrl = `https://${location.hostname}/api/v2/items/1/details`;
+        
+        // Close existing popup if any
+        if (captchaPopup && !captchaPopup.closed) {
+            captchaPopup.close();
+        }
+        
+        // Open small popup window
+        captchaPopup = window.open(
+            apiUrl,
+            'VintedCaptcha',
+            'width=500,height=600,scrollbars=yes,resizable=yes'
+        );
+        
+        updateStatusMessage('🔓 Solving captcha... complete it in the popup');
+        
+        // Start checking if captcha is solved
+        startCaptchaCheck();
+    }
+
+    function startCaptchaCheck() {
+        // Clear any existing interval
+        if (captchaCheckInterval) {
+            clearInterval(captchaCheckInterval);
+        }
+        
+        captchaCheckInterval = setInterval(async () => {
+            try {
+                // Try to fetch the API to see if captcha is solved
+                const response = await fetch(
+                    `https://${location.hostname}/api/v2/items/1/details`
+                );
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Check if we get the "not found" response (means captcha is solved)
+                    if (data.code === 104 || data.message_code === 'not_found' || data.item) {
+                        onCaptchaSolved();
+                    }
+                }
+            } catch (e) {
+                // Ignore errors, keep checking
+            }
+        }, 2000); // Check every 2 seconds
+    }
+
+    function onCaptchaSolved() {
+        // Stop checking
+        if (captchaCheckInterval) {
+            clearInterval(captchaCheckInterval);
+            captchaCheckInterval = null;
+        }
+        
+        // Close popup
+        if (captchaPopup && !captchaPopup.closed) {
+            captchaPopup.close();
+            captchaPopup = null;
+        }
+        
+        // Resume processing
+        isPausedForCaptcha = false;
+        const warningEl = document.getElementById('vinted-captcha-warning');
+        if (warningEl) {
+            warningEl.style.display = 'none';
+        }
+        
+        updateStatusMessage('✅ Captcha solved! Resuming...');
+        
+        // Small delay before resuming
+        setTimeout(() => {
+            updateStatusMessage('Processing items...');
+        }, 1500);
+    }
 
     /* =========================
        UI Menu - Enhanced GUI
@@ -273,7 +354,7 @@
                         <span>API Blocked</span>
                     </div>
                     <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
-                        Vinted has temporarily blocked API access. Please solve the captcha to continue.
+                        Solving captcha automatically. Complete it in the popup window.
                     </p>
                     <button id="vinted-open-captcha" style="
                         width: 100%;
@@ -288,7 +369,7 @@
                         margin-bottom: 8px;
                         transition: background 0.2s;
                     " onmouseover="this.style.background='#d32f2f'" onmouseout="this.style.background='#f44336'">
-                        🔓 Open Captcha Page
+                        🔓 Reopen Captcha Popup
                     </button>
                     <button id="vinted-resume" style="
                         width: 100%;
@@ -302,7 +383,7 @@
                         font-size: 13px;
                         transition: background 0.2s;
                     " onmouseover="this.style.background='#388e3c'" onmouseout="this.style.background='#4caf50'">
-                        ✅ I Solved the Captcha
+                        ✅ Resume Manually
                     </button>
                 </div>
 
@@ -424,10 +505,20 @@
         });
 
         document.getElementById('vinted-open-captcha').onclick = () => {
-            window.open(`https://${location.hostname}/api/v2/items/1/details`, '_blank');
+            openCaptchaPopup();
         };
 
         document.getElementById('vinted-resume').onclick = () => {
+            // Stop captcha checking
+            if (captchaCheckInterval) {
+                clearInterval(captchaCheckInterval);
+                captchaCheckInterval = null;
+            }
+            // Close popup if open
+            if (captchaPopup && !captchaPopup.closed) {
+                captchaPopup.close();
+                captchaPopup = null;
+            }
             isPausedForCaptcha = false;
             document.getElementById('vinted-captcha-warning').style.display = 'none';
             updateStatusMessage('Resuming processing...');
@@ -567,7 +658,8 @@
                 if (warningEl) {
                     warningEl.style.display = 'block';
                 }
-                updateStatusMessage('⚠️ API blocked - Please solve captcha');
+                // Auto-open captcha popup
+                openCaptchaPopup();
                 isProcessing = false;
                 return;
             }
