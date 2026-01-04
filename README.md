@@ -5,6 +5,7 @@
 ![JavaScript](https://img.shields.io/badge/javascript-ES6+-yellow?style=for-the-badge&logo=javascript&logoColor=white)
 
 > Reveal hidden seller locations on Vinted and filter items by country with a beautiful, intuitive UI.
+
 "<img width="1179" height="601" alt="image" src="https://github.com/user-attachments/assets/981cf27b-1a9a-4f2f-b696-aebcf60a2456" />
 
 
