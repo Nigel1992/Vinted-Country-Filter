@@ -1097,7 +1097,8 @@
     function detectDuplicates() {
         duplicateItems.clear();
         processedItems.forEach((item, itemId) => {
-            if (!item.country) return;
+            // Only track duplicates for items with seller information
+            if (!item.country || !item.seller) return;
             const key = generateDuplicateKey(item);
             if (!duplicateItems.has(key)) {
                 duplicateItems.set(key, []);
@@ -1110,7 +1111,7 @@
             if (itemIds.length > 1) {
                 itemIds.forEach(itemId => {
                     const item = processedItems.get(itemId);
-                    if (item?.element) {
+                    if (item?.element && item.seller) {
                         // Find the image container to anchor the badge
                         const imageContainer = item.element.querySelector('[class*="web_ui__Image__image"]') 
                             || item.element.querySelector('img')?.parentElement
