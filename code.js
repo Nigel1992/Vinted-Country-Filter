@@ -70,33 +70,11 @@
     let countrySectionCollapsed = sessionStorage.getItem('vinted_country_collapsed') === 'true';
     let isPaused = false;
     let flaggedSellers = new Set(JSON.parse(localStorage.getItem('vinted_flagged_sellers') || '[]'));
-    const sellerBadgeColors = new Map();
-    const badgePalette = [
-        ['#e91e63', '#c40714'],
-        ['#3f51b5', '#283593'],
-        ['#009688', '#00695c'],
-        ['#ff9800', '#f57c00'],
-        ['#9c27b0', '#7b1fa2'],
-        ['#2196f3', '#1976d2'],
-        ['#4caf50', '#388e3c'],
-        ['#ff5722', '#e64a19'],
-        ['#607d8b', '#455a64'],
-        ['#8bc34a', '#689f38']
-    ];
-    function getSellerGradient(key) {
-        const k = key || 'unknown';
-        if (!sellerBadgeColors.has(k)) {
-            const idx = sellerBadgeColors.size % badgePalette.length;
-            sellerBadgeColors.set(k, idx);
-        }
-        return badgePalette[sellerBadgeColors.get(k)];
-    }
 
     const processedItems = new Map();
     const queue = [];
     const CACHE_PREFIX = 'vinted_item_';
     const PRESETS_PREFIX = 'vinted_preset_';
-    const duplicateItems = new Map(); // Track duplicates: {key: [itemIds]}
 
     const countryToFlag = {
         netherlands: '🇳🇱',
@@ -874,7 +852,6 @@
         document.getElementById('vinted-reset-stats').addEventListener('click', () => {
             if (confirm('Reset all statistics counters?')) {
                 // Stats will reset on next filter apply
-                duplicateItems.clear();
                 updateStatusMessage('Stats reset!');
             }
         });
@@ -1075,92 +1052,6 @@
         badge.style.background = isFlagged ? 'linear-gradient(135deg, #ffb74d 0%, #ff9800 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,249,250,0.95) 100%)';
         badge.style.borderColor = isFlagged ? '#ff9800' : '#007782';
     }
-
-    /* =========================
-       Duplicate Detection
-    ========================== */
-
-    function generateDuplicateKey(item) {
-        // Prefer seller username when available; fallback to location label
-        if (item && item.seller) {
-            return `seller|${item.seller}`;
-        }
-        return `${item.country || 'unknown'}|${item.overlay?.textContent || 'unknown'}`;
-    }
-
-    function shortUsername(name) {
-        if (!name) return '';
-        const trimmed = String(name).trim();
-        return trimmed.length > 14 ? trimmed.slice(0, 13) + '…' : trimmed;
-    }
-
-    function detectDuplicates() {
-        duplicateItems.clear();
-        processedItems.forEach((item, itemId) => {
-            // Only track duplicates for items with seller information
-            if (!item.country || !item.seller) return;
-            const key = generateDuplicateKey(item);
-            if (!duplicateItems.has(key)) {
-                duplicateItems.set(key, []);
-            }
-            duplicateItems.get(key).push(itemId);
-        });
-
-        // Mark duplicate items with a badge
-        duplicateItems.forEach((itemIds, key) => {
-            if (itemIds.length > 1) {
-                itemIds.forEach(itemId => {
-                    const item = processedItems.get(itemId);
-                    if (item?.element && item.seller) {
-                        // Find the image container to anchor the badge
-                        const imageContainer = item.element.querySelector('[class*="web_ui__Image__image"]') 
-                            || item.element.querySelector('img')?.parentElement
-                            || item.element;
-                        
-                        // Search for existing badge in both locations
-                        let duplicateBadge = imageContainer.querySelector('.vinted-duplicate-badge')
-                            || item.element.querySelector('.vinted-duplicate-badge');
-                        
-                        if (!duplicateBadge) {
-                            duplicateBadge = document.createElement('div');
-                            duplicateBadge.className = 'vinted-duplicate-badge';
-                            duplicateBadge.style.cssText = `
-                                position: absolute;
-                                bottom: 8px;
-                                left: 8px;
-                                background: linear-gradient(135deg, rgba(233,30,99,0.9) 0%, rgba(194,7,20,0.9) 100%);
-                                color: #fff;
-                                padding: 4px 8px;
-                                font-size: 12px;
-                                border-radius: 8px;
-                                pointer-events: none;
-                                box-shadow: 0 4px 10px rgba(233,30,99,0.35);
-                                z-index: 11;
-                                font-weight: 600;
-                                backdrop-filter: saturate(120%) blur(1px);
-                            `;
-                            // Append to image container and set position
-                            imageContainer.style.position = imageContainer.style.position || 'relative';
-                            imageContainer.appendChild(duplicateBadge);
-                        }
-                        
-                        // Always update label/title to reflect current seller
-                        const label = item.seller ? `👤 ${shortUsername(item.seller)}` : '👤';
-                        duplicateBadge.textContent = label;
-                        duplicateBadge.title = item.seller ? `Same seller: ${item.seller}` : 'Same seller';
-                        // Apply consistent per-seller color
-                        const grad = getSellerGradient(item.seller || key);
-                        duplicateBadge.style.background = `linear-gradient(135deg, ${grad[0]} 0%, ${grad[1]} 100%)`;
-                        duplicateBadge.style.borderColor = grad[1];
-                    }
-                });
-            }
-        });
-
-        // Duplicates stat removed in 1.4.1.1; no count update
-    }
-
-    // updateDuplicateCount removed in 1.4.1.1
 
     /* =========================
        Scan items
@@ -1408,9 +1299,6 @@
             if (match) matches++;
         });
 
-        // Detect and mark duplicates
-        detectDuplicates();
-
         // Update match count
         const matchNumberEl = document.getElementById('vinted-match-number');
         if (matchNumberEl) {
@@ -1443,18 +1331,11 @@
             if (item.overlay && item.overlay.parentNode) {
                 item.overlay.remove();
             }
-            
-            // Remove duplicate badge
-            const duplicateBadge = item.element.querySelector('.vinted-duplicate-badge');
-            if (duplicateBadge) {
-                duplicateBadge.remove();
-            }
         });
         
         // Clear processed items and queue
         processedItems.clear();
         queue.length = 0;
-        duplicateItems.clear();
         
         // Update counters
         const matchNumberEl = document.getElementById('vinted-match-number');
