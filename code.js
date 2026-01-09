@@ -1111,7 +1111,11 @@
                 itemIds.forEach(itemId => {
                     const item = processedItems.get(itemId);
                     if (item?.element) {
-                        // Add duplicate indicator directly to item element to avoid blocking clicks
+                        // Find the image container to anchor the badge
+                        const imageContainer = item.element.querySelector('[class*="web_ui__Image__image"]') 
+                            || item.element.querySelector('img')?.parentElement
+                            || item.element;
+                        
                         let duplicateBadge = item.element.querySelector('.vinted-duplicate-badge');
                         if (!duplicateBadge) {
                             duplicateBadge = document.createElement('div');
@@ -1133,8 +1137,14 @@
                                 font-weight: 600;
                                 backdrop-filter: saturate(120%) blur(1px);
                             `;
-                            item.element.style.position = 'relative';
-                            item.element.appendChild(duplicateBadge);
+                            // Position relative on the image container
+                            if (imageContainer && imageContainer !== item.element) {
+                                imageContainer.style.position = imageContainer.style.position || 'relative';
+                                imageContainer.appendChild(duplicateBadge);
+                            } else {
+                                item.element.style.position = 'relative';
+                                item.element.appendChild(duplicateBadge);
+                            }
                         }
                         // Always update label/title to reflect current seller
                         const label = item.seller ? `👤 ${shortUsername(item.seller)}` : '👤';
