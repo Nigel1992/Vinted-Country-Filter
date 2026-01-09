@@ -494,7 +494,7 @@
                         justify-content: space-between;
                         margin-bottom: 8px;
                     " title="Number of duplicate items detected from same seller">
-                        <span style="color: ${darkMode ? '#aaa' : '#666'}; font-size: 13px; font-weight: 500;">🔄 Duplicates:</span>
+                        <span style="color: ${darkMode ? '#aaa' : '#666'}; font-size: 13px; font-weight: 500;">👤 Duplicates:</span>
                         <span id="vinted-duplicates-number" style="
                             background: #e91e63;
                             color: white;
@@ -1104,7 +1104,8 @@
                         if (!duplicateBadge) {
                             duplicateBadge = document.createElement('div');
                             duplicateBadge.className = 'vinted-duplicate-badge';
-                            duplicateBadge.textContent = '🔄';
+                            duplicateBadge.textContent = '👤';
+                            duplicateBadge.title = 'Same seller';
                             duplicateBadge.style.cssText = `
                                 position: absolute;
                                 top: 8px;
