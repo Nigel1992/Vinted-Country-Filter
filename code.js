@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.4.1
+// @version      1.4.1.1
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by including/excluding selected countries. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -509,24 +509,7 @@
                             text-align: center;
                         ">0</span>
                     </div>
-                    <div id="vinted-duplicates-count" style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        margin-bottom: 8px;
-                    " title="Number of duplicate items detected from same seller">
-                        <span style="color: ${darkMode ? '#aaa' : '#666'}; font-size: 13px; font-weight: 500;">👤 Duplicates:</span>
-                        <span id="vinted-duplicates-number" style="
-                            background: #e91e63;
-                            color: white;
-                            padding: 4px 12px;
-                            border-radius: 12px;
-                            font-weight: 600;
-                            font-size: 14px;
-                            min-width: 40px;
-                            text-align: center;
-                        ">0</span>
-                    </div>
+                    <!-- Duplicates stat removed in 1.4.1.1 hotfix -->
                     <div id="vinted-queue-count" style="
                         display: flex;
                         align-items: center;
@@ -726,7 +709,7 @@
                     padding-top: 8px;
                     border-top: 1px solid ${darkMode ? '#444' : '#eee'};
                 ">
-                    v1.4.1 • Jan 9, 2026
+                    v1.4.1.1 • Jan 10, 2026
                 </div>
             </div>
         `;
@@ -1174,21 +1157,10 @@
             }
         });
 
-        updateDuplicateCount();
+        // Duplicates stat removed in 1.4.1.1; no count update
     }
 
-    function updateDuplicateCount() {
-        const duplicateNumberEl = document.getElementById('vinted-duplicates-number');
-        if (duplicateNumberEl) {
-            let duplicateCount = 0;
-            duplicateItems.forEach((itemIds) => {
-                if (itemIds.length > 1) {
-                    duplicateCount += itemIds.length;
-                }
-            });
-            duplicateNumberEl.textContent = duplicateCount;
-        }
-    }
+    // updateDuplicateCount removed in 1.4.1.1
 
     /* =========================
        Scan items
@@ -1487,11 +1459,11 @@
         // Update counters
         const matchNumberEl = document.getElementById('vinted-match-number');
         const totalNumberEl = document.getElementById('vinted-total-number');
-        const duplicatesNumberEl = document.getElementById('vinted-duplicates-number');
+        // Duplicates stat removed in 1.4.1.1
         const queueNumberEl = document.getElementById('vinted-queue-number');
         if (matchNumberEl) matchNumberEl.textContent = '-';
         if (totalNumberEl) totalNumberEl.textContent = '-';
-        if (duplicatesNumberEl) duplicatesNumberEl.textContent = '0';
+        // No duplicates counter to reset
         if (queueNumberEl) queueNumberEl.textContent = '0';
         
         // Hide progress bar

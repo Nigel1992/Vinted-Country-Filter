@@ -1,3 +1,9 @@
+## [1.4.1.1] - 2026-01-10
+
+### Changed
+- Removed duplicates count/stat from the UI to prevent confusion.
+- Duplicate detection badges remain; only the stats panel counter was removed.
+
 # Changelog
 
 All notable changes to the Vinted Geolocator userscript will be documented in this file.
