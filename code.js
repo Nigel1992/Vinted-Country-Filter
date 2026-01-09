@@ -1013,6 +1013,15 @@
     }
 
     // Flagged seller badge handling
+    function updateAllItemsForSeller(seller) {
+        // Update all items from this seller
+        processedItems.forEach(item => {
+            if (item.seller === seller) {
+                updateSellerFlagBadge(item);
+            }
+        });
+    }
+
     function updateSellerFlagBadge(item) {
         if (!item?.element || !item?.seller) return;
         let badge = item.element.querySelector('.vinted-flag-badge');
@@ -1036,13 +1045,15 @@
             `;
             badge.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (flaggedSellers.has(item.seller)) {
-                    flaggedSellers.delete(item.seller);
+                const sellerToUpdate = item.seller;
+                if (flaggedSellers.has(sellerToUpdate)) {
+                    flaggedSellers.delete(sellerToUpdate);
                 } else {
-                    flaggedSellers.add(item.seller);
+                    flaggedSellers.add(sellerToUpdate);
                 }
                 localStorage.setItem('vinted_flagged_sellers', JSON.stringify(Array.from(flaggedSellers)));
-                updateSellerFlagBadge(item);
+                // Update all items from this seller
+                updateAllItemsForSeller(sellerToUpdate);
             });
             item.element.style.position = 'relative';
             item.element.appendChild(badge);
@@ -1051,6 +1062,7 @@
         badge.title = (isFlagged ? 'Unflag seller ' : 'Flag seller ') + (item.seller || '');
         badge.style.background = isFlagged ? 'linear-gradient(135deg, #ffb74d 0%, #ff9800 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,249,250,0.95) 100%)';
         badge.style.borderColor = isFlagged ? '#ff9800' : '#007782';
+        badge.style.color = isFlagged ? 'white' : '#333';
     }
 
     /* =========================
