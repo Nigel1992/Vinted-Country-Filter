@@ -70,6 +70,27 @@
     let countrySectionCollapsed = sessionStorage.getItem('vinted_country_collapsed') === 'true';
     let isPaused = false;
     let flaggedSellers = new Set(JSON.parse(localStorage.getItem('vinted_flagged_sellers') || '[]'));
+    const sellerBadgeColors = new Map();
+    const badgePalette = [
+        ['#e91e63', '#c40714'],
+        ['#3f51b5', '#283593'],
+        ['#009688', '#00695c'],
+        ['#ff9800', '#f57c00'],
+        ['#9c27b0', '#7b1fa2'],
+        ['#2196f3', '#1976d2'],
+        ['#4caf50', '#388e3c'],
+        ['#ff5722', '#e64a19'],
+        ['#607d8b', '#455a64'],
+        ['#8bc34a', '#689f38']
+    ];
+    function getSellerGradient(key) {
+        const k = key || 'unknown';
+        if (!sellerBadgeColors.has(k)) {
+            const idx = sellerBadgeColors.size % badgePalette.length;
+            sellerBadgeColors.set(k, idx);
+        }
+        return badgePalette[sellerBadgeColors.get(k)];
+    }
 
     const processedItems = new Map();
     const queue = [];
@@ -1144,6 +1165,10 @@
                         const label = item.seller ? `👤 ${shortUsername(item.seller)}` : '👤';
                         duplicateBadge.textContent = label;
                         duplicateBadge.title = item.seller ? `Same seller: ${item.seller}` : 'Same seller';
+                        // Apply consistent per-seller color
+                        const grad = getSellerGradient(item.seller || key);
+                        duplicateBadge.style.background = `linear-gradient(135deg, ${grad[0]} 0%, ${grad[1]} 100%)`;
+                        duplicateBadge.style.borderColor = grad[1];
                     }
                 });
             }
