@@ -5,6 +5,27 @@ All notable changes to the Vinted Geolocator userscript will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-09
+
+### Added
+- **Include mode (whitelist filtering)** - Changed from exclude/blacklist mode to include/whitelist mode
+  - Users now select which countries they want to **show** instead of which to hide
+  - More intuitive filtering: "Include Countries" instead of "Exclude Countries"
+  - If no countries selected, all items are shown; if countries selected, only those are shown
+
+### Changed
+- Filter logic inverted: display items only from selected countries (if any selected)
+- Session storage key changed from `vinted_excluded_countries` to `vinted_included_countries`
+- All checkbox IDs changed from `exclude-{country}` to `include-{country}`
+- Status messages updated: "Showing only X" instead of "Excluding X"
+- Preset system now saves/loads included countries instead of excluded
+- Minimize button shows count of hidden items when selection is active
+
+### Technical
+- Filter logic: `match = includedCountries.length === 0 || includedCountries.includes(item.country)`
+- Allows seamless migration: users can manually re-select preferred countries
+- Maintains all other features: presets, duplicates, dark mode, caching
+
 ## [1.3.0] - 2026-01-04
 
 ### Added
