@@ -747,7 +747,7 @@
                     padding-top: 8px;
                     border-top: 1px solid ${darkMode ? '#444' : '#eee'};
                 ">
-                    v1.4.2 • Jan 17, 2026
+                    v1.4.5 • Jan 28, 2026
                 </div>
             </div>
         `;
