@@ -39,30 +39,32 @@
     // Check if user is logged in to Vinted
 
     function isUserLoggedIn() {
-        // Only check for a visible 'Log out' button or span (case-insensitive)
-        const logoutEl = Array.from(document.querySelectorAll('span,button,a,div')).find(el =>
-            el.textContent && el.textContent.trim().toLowerCase() === 'log out'
-        );
-        return !!logoutEl;
+        // Check for the presence of <figure class="header-avatar">, which only appears when logged in
+        return !!document.querySelector('figure.header-avatar');
     }
 
     if (!isUserLoggedIn()) {
-        const msg = '⚠️ You must be logged in to Vinted for this script to work. Please log in and refresh the page.';
-        alert(msg);
-        // Optionally, show a visible message on the page as well
-        const div = document.createElement('div');
-        div.textContent = msg;
-        div.style.position = 'fixed';
-        div.style.top = '0';
-        div.style.left = '0';
-        div.style.width = '100%';
-        div.style.background = '#ffefc1';
-        div.style.color = '#a00';
-        div.style.fontSize = '18px';
-        div.style.textAlign = 'center';
-        div.style.zIndex = '99999';
-        div.style.padding = '12px 0';
-        document.body.appendChild(div);
+        const msg = '⚠️ [Vinted Country & City Filter] You must be logged in to Vinted for this script to work. Please log in and refresh the page.';
+        const banner = document.createElement('div');
+        banner.textContent = msg;
+        banner.style.position = 'fixed';
+        banner.style.top = '0';
+        banner.style.left = '0';
+        banner.style.width = '100vw';
+        banner.style.background = '#ffefc1';
+        banner.style.color = '#a00';
+        banner.style.fontSize = '18px';
+        banner.style.textAlign = 'center';
+        banner.style.zIndex = '2147483647';
+        banner.style.padding = '16px 0';
+        banner.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+        banner.style.fontFamily = 'inherit';
+        banner.style.fontWeight = 'bold';
+        banner.style.letterSpacing = '0.5px';
+        banner.style.userSelect = 'none';
+        // Add margin to body so banner doesn't cover top nav
+        document.body.style.marginTop = '56px';
+        document.body.appendChild(banner);
         return;
     }
 
@@ -147,27 +149,28 @@
     ========================== */
 
     function openCaptchaPopup() {
-        // Instead of a popup, show a persistent banner at the top of the site
-        const bannerId = 'vinted-captcha-banner';
-        let banner = document.getElementById(bannerId);
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = bannerId;
-            banner.style.position = 'fixed';
-            banner.style.top = '0';
-            banner.style.left = '0';
-            banner.style.width = '100%';
-            banner.style.background = '#fffbe6';
-            banner.style.color = '#a00';
-            banner.style.fontSize = '18px';
-            banner.style.textAlign = 'center';
-            banner.style.zIndex = '99999';
-            banner.style.padding = '16px 0';
-            banner.style.borderBottom = '2px solid #ffe066';
-            banner.innerHTML = '<b>Vinted Filter:</b> Please complete the captcha challenge below to continue using the script. The script will automatically resume once the captcha is solved.';
-            document.body.appendChild(banner);
-            // Optionally, scroll to top so user sees the banner
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        const apiUrl = `https://${location.hostname}/api/v2/items/1/details`;
+        
+        // Close existing popup if any
+        if (captchaPopup && !captchaPopup.closed) {
+            captchaPopup.close();
+        }
+        
+        // Open small popup window
+        captchaPopup = window.open(
+            apiUrl,
+            'VintedCaptcha',
+            'width=500,height=600,scrollbars=yes,resizable=yes'
+        );
+        
+        // Check if popup was blocked
+        if (!captchaPopup || captchaPopup.closed || typeof captchaPopup.closed === 'undefined') {
+            console.warn('[Vinted Filter] Popup was blocked by browser. Please allow popups for this site and refresh the page.');
+            updateStatusMessage('⚠️ Popup blocked! Please allow popups for this site in your browser settings, then refresh the page and try again.');
+            alert('Vinted Filter: Popup was blocked! Please allow popups for this site in your browser settings, then refresh the page and try again.');
+            return false;
+        } else {
+            updateStatusMessage('A popup window has been opened to automatically solve the captcha. Please complete the captcha in the popup window. The script will automatically detect when it\'s solved and continue processing. If you do not see a popup, check your browser\'s popup settings.');
         }
         // Start checking if captcha is solved
         startCaptchaCheck();
