@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.4.2
+// @version      1.4.3
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by including/excluding selected countries. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -12,6 +12,24 @@
 // @match        https://www.vinted.es/*
 // @match        https://www.vinted.de/*
 // @match        https://www.vinted.se/*
+// @match        https://www.vinted.lt/*
+// @match        https://www.vinted.pl/*
+// @match        https://www.vinted.cz/*
+// @match        https://www.vinted.hu/*
+// @match        https://www.vinted.sk/*
+// @match        https://www.vinted.pt/*
+// @match        https://www.vinted.lu/*
+// @match        https://www.vinted.ro/*
+// @match        https://www.vinted.gr/*
+// @match        https://www.vinted.bg/*
+// @match        https://www.vinted.si/*
+// @match        https://www.vinted.hr/*
+// @match        https://www.vinted.ie/*
+// @match        https://www.vinted.com/*
+// @match        https://www.vinted.at/*    // Austria 🇦🇹
+// @match        https://www.vinted.dk/*    // Denmark 🇩🇰 (placeholder)
+// @match        https://www.vinted.fi/*    // Finland 🇫🇮 (placeholder)
+// @match        https://www.vinted.co.uk/* // United Kingdom 🇬🇧 (placeholder)
 // @grant        none
 // @run-at       document-end
 // ==/UserScript==
