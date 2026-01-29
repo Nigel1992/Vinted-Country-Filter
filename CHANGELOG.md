@@ -1,3 +1,12 @@
+## [1.4.6] - 2026-01-29
+
+### Added
+- Do not show the "You must be logged in" warning on API pages (URLs containing `/api/`) to avoid showing the banner when visiting API endpoints directly.
+- Expanded the list of countries in **Settings > Include Countries** to include full country names commonly used on Vinted (e.g., **United Kingdom**, **Ireland**, **Austria**, **Czech Republic**, etc.). Country names are normalized internally for reliable matching.
+
+### Changed
+- Bumped version to **1.4.6** and updated release date to **Jan 29, 2026**.
+
 ## [1.4.2] - 2026-01-17
 
 ### Added

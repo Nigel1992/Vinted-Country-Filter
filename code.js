@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.4.5
+// @version      1.4.6
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by including/excluding selected countries. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -45,7 +45,8 @@
 
     // Skip login check if captcha is being shown (isPausedForCaptcha or captcha warning visible)
     const captchaWarning = document.getElementById('vinted-captcha-warning');
-    if (!isUserLoggedIn() && !(window.isPausedForCaptcha || (captchaWarning && captchaWarning.style.display === 'block'))) {
+    // Do not show login warning when visiting API endpoints directly (e.g., /api/...)
+    if (!isUserLoggedIn() && !(window.isPausedForCaptcha || (captchaWarning && captchaWarning.style.display === 'block')) && !window.location.pathname.includes('/api/')) {
         const msg = '⚠️ [Vinted Country & City Filter] You must be logged in to Vinted for this script to work. Please log in and refresh the page.';
         const banner = document.createElement('div');
         banner.textContent = msg;
@@ -112,6 +113,8 @@
     ========================== */
 
     let includedCountries = JSON.parse(sessionStorage.getItem('vinted_included_countries') || '[]');
+    // Normalize any previously saved entries
+    includedCountries = includedCountries.map(c => normalizeCountryName(c));
     let isFilterEnabled = sessionStorage.getItem('vinted_filter_enabled') !== 'false'; // Default: enabled
     let isProcessing = false;
     let isPausedForCaptcha = false;
@@ -132,19 +135,52 @@
     const PRESETS_PREFIX = 'vinted_preset_';
 
     const countryToFlag = {
-        netherlands: '🇳🇱',
-        belgium: '🇧🇪',
-        france: '🇫🇷',
-        germany: '🇩🇪',
-        spain: '🇪🇸',
-        italy: '🇮🇹',
-        portugal: '🇵🇹',
-        poland: '🇵🇱',
-        uk: '🇬🇧',
-        sweden: '🇸🇪',
-        denmark: '🇩🇰',
-        finland: '🇫🇮'
+        'netherlands': '🇳🇱',
+        'belgium': '🇧🇪',
+        'france': '🇫🇷',
+        'germany': '🇩🇪',
+        'spain': '🇪🇸',
+        'italy': '🇮🇹',
+        'portugal': '🇵🇹',
+        'poland': '🇵🇱',
+        'united kingdom': '🇬🇧',
+        'uk': '🇬🇧',
+        'sweden': '🇸🇪',
+        'denmark': '🇩🇰',
+        'finland': '🇫🇮',
+        'ireland': '🇮🇪',
+        'austria': '🇦🇹',
+        'romania': '🇷🇴',
+        'greece': '🇬🇷',
+        'bulgaria': '🇧🇬',
+        'slovenia': '🇸🇮',
+        'croatia': '🇭🇷',
+        'czech republic': '🇨🇿',
+        'hungary': '🇭🇺',
+        'slovakia': '🇸🇰',
+        'lithuania': '🇱🇹',
+        'luxembourg': '🇱🇺'
     };
+
+    // Normalize country names returned by the API to canonical keys used throughout the script
+    function normalizeCountryName(name) {
+        if (!name) return '';
+        const s = String(name).toLowerCase().trim();
+
+        if (s === 'uk' || s === 'gb' || s.includes('united kingdom') || s.includes('great britain')) return 'united kingdom';
+        if (s.includes('czech')) return 'czech republic';
+        if (s.includes('slovak')) return 'slovakia';
+        if (s.includes('luxembourg')) return 'luxembourg';
+        if (s.includes('ireland')) return 'ireland';
+
+        const keywords = ['netherlands','belgium','france','germany','spain','italy','portugal','poland','sweden','denmark','finland','austria','romania','greece','bulgaria','slovenia','croatia','lithuania','hungary'];
+        for (const kw of keywords) {
+            if (s.includes(kw)) return kw;
+        }
+
+        // Fallback: collapse multiple spaces into single space
+        return s.replace(/\s+/g, ' ');
+    }
 
     /* =========================
        Auto Captcha Solver
@@ -740,8 +776,36 @@
                                     <span>🇫🇮 Finland</span>
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
-                                    <input type="checkbox" id="include-uk" style="margin: 0;">
+                                    <input type="checkbox" id="include-united-kingdom" style="margin: 0;">
                                     <span>🇬🇧 United Kingdom</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-ireland" style="margin: 0;">
+                                    <span>🇮🇪 Ireland</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-austria" style="margin: 0;">
+                                    <span>🇦🇹 Austria</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-romania" style="margin: 0;">
+                                    <span>🇷🇴 Romania</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-greece" style="margin: 0;">
+                                    <span>🇬🇷 Greece</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-bulgaria" style="margin: 0;">
+                                    <span>🇧🇬 Bulgaria</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-slovenia" style="margin: 0;">
+                                    <span>🇸🇮 Slovenia</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.2s; color: ${darkMode ? '#ddd' : '#333'};" onmouseover="this.style.background='${darkMode ? '#444' : '#f0f0f0'}'" onmouseout="this.style.background='transparent'">
+                                    <input type="checkbox" id="include-croatia" style="margin: 0;">
+                                    <span>🇭🇷 Croatia</span>
                                 </label>
                             </div>
                         </div>
@@ -756,7 +820,7 @@
                     padding-top: 8px;
                     border-top: 1px solid ${darkMode ? '#444' : '#eee'};
                 ">
-                    v1.4.5 • Jan 28, 2026
+                    v1.4.6 • Jan 29, 2026
                 </div>
             </div>
         `;
@@ -860,12 +924,14 @@
         function loadPreset(name) {
             const presets = getPresets();
             if (presets[name]) {
-                includedCountries = presets[name].countries || [];
+                // Normalize any stored values to canonical keys
+                includedCountries = (presets[name].countries || []).map(c => normalizeCountryName(c));
                 sessionStorage.setItem('vinted_included_countries', JSON.stringify(includedCountries));
                 // Update checkboxes
                 document.querySelectorAll('#vinted-country-checkboxes input[type="checkbox"]').forEach(cb => {
-                    const country = cb.id.replace('include-', '');
-                    cb.checked = includedCountries.includes(country);
+                    const raw = cb.id.replace('include-', '').replace(/-/g, ' ');
+                    const key = normalizeCountryName(raw);
+                    cb.checked = includedCountries.includes(key);
                 });
                 applyFilter();
                 updateStatusMessage(`Preset "${name}" loaded!`);
@@ -962,18 +1028,19 @@
         });
         const countryCheckboxes = document.querySelectorAll('#vinted-country-checkboxes input[type="checkbox"]');
         countryCheckboxes.forEach(checkbox => {
-            const country = checkbox.id.replace('include-', '');
-            checkbox.checked = includedCountries.includes(country);
+            checkbox.checked = includedCountries.includes(normalizeCountryName(checkbox.id.replace('include-', '').replace(/-/g, ' ')));
             checkbox.addEventListener('change', () => {
+                const raw = checkbox.id.replace('include-', '').replace(/-/g, ' ');
+                const countryKey = normalizeCountryName(raw);
                 if (checkbox.checked) {
-                    if (!includedCountries.includes(country)) {
-                        includedCountries.push(country);
+                    if (!includedCountries.includes(countryKey)) {
+                        includedCountries.push(countryKey);
                     }
                 } else {
-                    includedCountries = includedCountries.filter(c => c !== country);
+                    includedCountries = includedCountries.filter(c => c !== countryKey);
                 }
                 sessionStorage.setItem('vinted_included_countries', JSON.stringify(includedCountries));
-                const includedNames = includedCountries.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+                const includedNames = includedCountries.map(c => c.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).join(', ');
                 updateStatusMessage(includedCountries.length > 0 ? `Showing only ${includedNames}...` : 'Showing all countries...');
                 applyFilter();
             });
@@ -1208,15 +1275,16 @@
             // Load cached items instantly without queueing
             const cachedData = getCachedItem(itemId);
             if (cachedData) {
-                const country = cachedData.country;
-                const city = cachedData.city;
-                const flag = countryToFlag[country] || '🏳️';
+const countryKey = cachedData.country; // normalized
+            const displayCountry = cachedData.displayCountry || countryKey;
+            const city = cachedData.city;
+            const flag = countryToFlag[countryKey] || '🏳️';
 
-                itemData.country = country;
-                itemData.seller = cachedData.username || '';
-                itemData.overlay.textContent = city
-                    ? `${flag} ${country.charAt(0).toUpperCase() + country.slice(1)}, ${city}`
-                    : `${flag} ${country.charAt(0).toUpperCase() + country.slice(1)}`;
+            itemData.country = countryKey;
+            itemData.seller = cachedData.username || '';
+            itemData.overlay.textContent = city
+                ? `${flag} ${displayCountry}, ${city}`
+                : `${flag} ${displayCountry}`;
 
                 // Enhanced overlay styling after loading
                 itemData.overlay.style.background = 'linear-gradient(135deg, rgba(76,175,80,0.95) 0%, rgba(56,142,60,0.95) 100%)';
@@ -1250,9 +1318,10 @@
         }
     }
 
-    function setCachedItem(itemId, country, city, username = '') {
+    function setCachedItem(itemId, displayCountry, city, username = '') {
         try {
-            const data = { country: country.toLowerCase(), city, username, timestamp: Date.now() };
+            const normalized = normalizeCountryName(displayCountry);
+            const data = { country: normalized, displayCountry: displayCountry, city, username, timestamp: Date.now() };
             localStorage.setItem(CACHE_PREFIX + itemId, JSON.stringify(data));
         } catch (e) {
             console.warn('Error writing to cache:', e);
@@ -1340,19 +1409,20 @@
 
             if (response.ok) {
                 const data = await response.json();
-                const country = data?.item?.user?.country_title_local || 'Unknown';
+                const rawCountry = data?.item?.user?.country_title_local || 'Unknown';
                 const city = data?.item?.user?.city || '';
                 const username = data?.item?.user?.login || data?.item?.user?.username || '';
-                const flag = countryToFlag[country.toLowerCase()] || '🏳️';
+                const countryKey = normalizeCountryName(rawCountry);
+                const flag = countryToFlag[countryKey] || '🏳️';
 
-                item.country = country.toLowerCase();
+                item.country = countryKey; // normalized key used for filtering
                 item.seller = username;
                 item.overlay.textContent = city
-                    ? `${flag} ${country}, ${city}`
-                    : `${flag} ${country}`;
+                    ? `${flag} ${rawCountry}, ${city}`
+                    : `${flag} ${rawCountry}`;
 
-                // Cache the data
-                setCachedItem(item.id, country, city, username);
+                // Cache the data (store both normalized key and display country)
+                setCachedItem(item.id, rawCountry, city, username);
 
                 // Enhanced overlay styling after loading
                 item.overlay.style.background = 'linear-gradient(135deg, rgba(76,175,80,0.95) 0%, rgba(56,142,60,0.95) 100%)';
