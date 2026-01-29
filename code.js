@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.4.6
+// @version      1.4.7
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by including/excluding selected countries. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -820,7 +820,7 @@
                     padding-top: 8px;
                     border-top: 1px solid ${darkMode ? '#444' : '#eee'};
                 ">
-                    v1.4.6 • Jan 29, 2026
+                    v1.4.7 • Jan 29, 2026
                 </div>
             </div>
         `;
@@ -1581,51 +1581,43 @@ const countryKey = cachedData.country; // normalized
 
         let isEnglish = false;
 
-        // Method 1: Check desktop language selector button text
-        const langButton = document.querySelector('[data-testid="language-selector-button"]');
-        if (langButton) {
-            const label = langButton.querySelector('.web_ui__Button__label');
-            if (label) {
-                const buttonText = label.textContent.trim().toUpperCase();
-                if (buttonText === 'EN' || buttonText === 'ENG') {
-                    isEnglish = true;
-                }
+        // Method 0: Check <html lang="..."> attribute first (preferred)
+        try {
+            const htmlLang = document.documentElement && document.documentElement.getAttribute && document.documentElement.getAttribute('lang');
+            if (htmlLang && htmlLang.toLowerCase().startsWith('en')) {
+                isEnglish = true;
             }
+        } catch (e) {
+            // ignore
         }
 
-        // Method 2: Check if English option is selected (has bold/amplified classes)
+        // Method 1: Check meta tags for content="en" or content starting with en
         if (!isEnglish) {
-            const englishOption = document.querySelector('[data-testid="language-option-EN"]');
-            if (englishOption) {
-                const content = englishOption.querySelector('[data-testid="language-option-EN--content"]');
-                if (content) {
-                    const textElements = content.querySelectorAll('.web_ui__Text__amplified, .web_ui__Text__bold');
-                    if (textElements.length >= 2) { // Both title and subtitle should be bold when selected
+            try {
+                const metas = Array.from(document.querySelectorAll('meta'));
+                for (const m of metas) {
+                    const content = (m.getAttribute('content') || '').toLowerCase().trim();
+                    if (!content) continue;
+
+                    // Common formats: "en", "en-US", "en; charset=utf-8"
+                    if (content === 'en' || content.startsWith('en-') || content.split(/[;,]/)[0].trim() === 'en') {
                         isEnglish = true;
+                        break;
                     }
-                }
-            }
-        }
 
-        // Method 3: Check mobile language display (in settings)
-        if (!isEnglish) {
-            const mobileLangCells = document.querySelectorAll('.web_ui__Cell__content');
-            for (const cell of mobileLangCells) {
-                const title = cell.querySelector('h3.web_ui__Text__amplified');
-                const subtitle = cell.querySelector('h3.web_ui__Text__muted');
-                if (title && subtitle) {
-                    const titleText = title.textContent.trim().toLowerCase();
-                    const subtitleText = subtitle.textContent.trim().toLowerCase();
-                    if ((titleText === 'english' || titleText === 'en') &&
-                        (subtitleText === 'english' || subtitleText === '(english)')) {
+                    const name = (m.getAttribute('name') || '').toLowerCase();
+                    const http = (m.getAttribute('http-equiv') || '').toLowerCase();
+                    if ((name === 'content-language' || http === 'content-language' || name === 'language' || name === 'locale') && content.startsWith('en')) {
                         isEnglish = true;
                         break;
                     }
                 }
+            } catch (e) {
+                // ignore DOM errors
             }
         }
 
-        // Method 4: Check URL parameter (some Vinted sites use ?locale=en)
+        // Method 2: Check URL parameter as a fallback (e.g., ?locale=en)
         if (!isEnglish) {
             const urlParams = new URLSearchParams(window.location.search);
             const locale = urlParams.get('locale');

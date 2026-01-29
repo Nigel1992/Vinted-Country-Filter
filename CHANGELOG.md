@@ -1,3 +1,11 @@
+## [1.4.7] - 2026-01-29
+
+### Changed
+- Improved language detection for determining if Vinted is set to English:
+  - Prefer the HTML source (`<html lang="...">`) and `meta` tags with `content` values that are `en` or start with `en` (e.g., `en`, `en-US`).
+  - Fallback to the `?locale=...` URL parameter when necessary.
+  - Removed brittle DOM text-based heuristics in favor of stable source attributes.
+
 ## [1.4.6] - 2026-01-29
 
 ### Added
