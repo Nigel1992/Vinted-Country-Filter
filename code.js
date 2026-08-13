@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vinted Country & City Filter (client-side)
 // @namespace    https://greasyfork.org/en/users/1550823-nigel1992
-// @version      1.4.7
+// @version      1.4.8
 // @description  Adds a country and city indicator to Vinted items and allows client-side visual filtering by including/excluding selected countries. The script uses Vinted’s public item API to retrieve country and city information. It does not perform purchases, send messages, or modify anything on Vinted servers.
 // @author       Nigel1992
 // @license      MIT
@@ -26,27 +26,57 @@
 // @match        https://www.vinted.hr/*
 // @match        https://www.vinted.ie/*
 // @match        https://www.vinted.com/*
-// @match        https://www.vinted.at/*    // Austria 🇦🇹
-// @match        https://www.vinted.dk/*    // Denmark 🇩🇰 (placeholder)
-// @match        https://www.vinted.fi/*    // Finland 🇫🇮 (placeholder)
-// @match        https://www.vinted.co.uk/* // United Kingdom 🇬🇧 (placeholder)
+// @match        https://www.vinted.at/*
+// @match        https://www.vinted.dk/*
+// @match        https://www.vinted.fi/*
+// @match        https://www.vinted.co.uk/*
 // @grant        none
 // @run-at       document-end
 // ==/UserScript==
 
 
 (function () {
-    // Check if user is logged in to Vinted
+    function queryAny(selectors) {
+        return selectors.some(selector => {
+            try {
+                return !!document.querySelector(selector);
+            } catch (e) {
+                return false;
+            }
+        });
+    }
 
     function isUserLoggedIn() {
-        // Check for the presence of <figure class="header-avatar">, which only appears when logged in
-        return !!document.querySelector('figure.header-avatar');
+        return queryAny([
+            'figure.header-avatar',
+            '[data-testid="header--user-menu-button"]',
+            '[data-testid="header-user-menu-button"]',
+            '[data-testid="header--profile-button"]',
+            '[data-testid="header-profile-button"]',
+            '[data-testid="user-menu-button"]',
+            '[data-testid="header--notifications-button"]',
+            '[data-testid="header--conversations-button"]',
+            'button[aria-label*="profile" i]',
+            'button[aria-label*="account" i]'
+        ]);
+    }
+
+    function isUserLoggedOut() {
+        if (isUserLoggedIn()) return false;
+        return queryAny([
+            '[data-testid="header--login-button"]',
+            '[data-testid="header-login-button"]',
+            '[data-testid*="sign-in"]',
+            '[data-testid*="login"]',
+            'a[href*="/login"]',
+            'a[href*="/member/general/login"]'
+        ]);
     }
 
     // Skip login check if captcha is being shown (isPausedForCaptcha or captcha warning visible)
     const captchaWarning = document.getElementById('vinted-captcha-warning');
     // Do not show login warning when visiting API endpoints directly (e.g., /api/...)
-    if (!isUserLoggedIn() && !(window.isPausedForCaptcha || (captchaWarning && captchaWarning.style.display === 'block')) && !window.location.pathname.includes('/api/')) {
+    if (isUserLoggedOut() && !(window.isPausedForCaptcha || (captchaWarning && captchaWarning.style.display === 'block')) && !window.location.pathname.includes('/api/')) {
         const msg = '⚠️ [Vinted Country & City Filter] You must be logged in to Vinted for this script to work. Please log in and refresh the page.';
         const banner = document.createElement('div');
         banner.textContent = msg;
@@ -103,7 +133,8 @@
     - Filtering is purely visual (opacity and grayscale) and does not affect
       Vinted search results or server-side filters.
     - The script may temporarily pause if Vinted returns a 403 (captcha)
-      or 429 (rate limit). In this case the user must manually solve the captcha.
+      or 429 (rate limit). In this case the script retries real item API
+      requests and resumes when access is restored.
     - No data is sent to third parties. The script contains no tracking,
       advertising, miners, or other self-gain functionality.
     */
@@ -120,6 +151,9 @@
     let isPausedForCaptcha = false;
     let captchaPopup = null;
     let captchaCheckInterval = null;
+    let captchaProbeItemIds = [];
+    let captchaProbeIndex = 0;
+    let captchaRetryAttempt = 0;
     let isWaitingForEnglish = false;
     let englishCheckComplete = false;
     let darkMode = sessionStorage.getItem('vinted_dark_mode') === 'true';
@@ -133,6 +167,7 @@
     const queue = [];
     const CACHE_PREFIX = 'vinted_item_';
     const PRESETS_PREFIX = 'vinted_preset_';
+    const API_RECOVERY_RETRY_DELAYS = [5000, 15000, 30000, 60000];
 
     const countryToFlag = {
         'netherlands': '🇳🇱',
@@ -166,20 +201,47 @@
     function normalizeCountryName(name) {
         if (!name) return '';
         const s = String(name).toLowerCase().trim();
+        const normalized = s.normalize
+            ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            : s;
 
-        if (s === 'uk' || s === 'gb' || s.includes('united kingdom') || s.includes('great britain')) return 'united kingdom';
-        if (s.includes('czech')) return 'czech republic';
-        if (s.includes('slovak')) return 'slovakia';
-        if (s.includes('luxembourg')) return 'luxembourg';
-        if (s.includes('ireland')) return 'ireland';
+        if (normalized === 'uk' || normalized === 'gb') return 'united kingdom';
 
-        const keywords = ['netherlands','belgium','france','germany','spain','italy','portugal','poland','sweden','denmark','finland','austria','romania','greece','bulgaria','slovenia','croatia','lithuania','hungary'];
-        for (const kw of keywords) {
-            if (s.includes(kw)) return kw;
+        const countryAliases = {
+            'netherlands': ['netherlands', 'nederland', 'nederlanden', 'pays bas', 'pays-bas', 'paises bajos', 'paesi bassi', 'niederlande', 'holanda', 'holandia', 'nizozemsko', 'nizozemska'],
+            'belgium': ['belgium', 'belgie', 'belgique', 'belgio', 'belgica', 'belgien'],
+            'france': ['france', 'frankrijk', 'frankreich', 'francia', 'francja', 'francie'],
+            'germany': ['germany', 'deutschland', 'duitsland', 'allemagne', 'alemania', 'germania', 'niemcy', 'nemecko', 'nemecka'],
+            'spain': ['spain', 'espana', 'spanje', 'spanien', 'espagne', 'hiszpania', 'spagna', 'spanelsko'],
+            'italy': ['italy', 'italia', 'italie', 'italien', 'wlochy', 'włochy', 'itálie'],
+            'portugal': ['portugal', 'portugalia', 'portugalsko'],
+            'poland': ['poland', 'polska', 'polen', 'pologne', 'polonia', 'polsko'],
+            'united kingdom': ['united kingdom', 'great britain', 'verenigd koninkrijk', 'vereinigtes konigreich', 'royaume uni', 'royaume-uni', 'reino unido', 'regno unito', 'wielka brytania', 'velka britanie'],
+            'sweden': ['sweden', 'sverige', 'zweden', 'schweden', 'suede', 'suecia', 'svezia', 'szwecja', 'svedsko'],
+            'denmark': ['denmark', 'danmark', 'denemarken', 'danemark', 'dinamarca', 'danimarca', 'dania', 'dansko'],
+            'finland': ['finland', 'suomi', 'finlande', 'finlandia', 'finsko'],
+            'ireland': ['ireland', 'ierland', 'irland', 'irlande', 'irlanda', 'irlandia', 'irsko'],
+            'austria': ['austria', 'osterreich', 'oostenrijk', 'autriche', 'austria', 'rakousko'],
+            'romania': ['romania', 'roemenie', 'rumania', 'roumanie', 'rumunsko'],
+            'greece': ['greece', 'griekenland', 'griechenland', 'grece', 'grecia', 'grecja', 'recko', 'hellas'],
+            'bulgaria': ['bulgaria', 'bulgarije', 'bulgarien', 'bulgarie', 'bulharsko'],
+            'slovenia': ['slovenia', 'slovenie', 'slowenien', 'slovenija', 'eslovenia', 'slowenia', 'slovinsko'],
+            'croatia': ['croatia', 'kroatie', 'kroatien', 'croatie', 'croazia', 'chorwacja', 'chorvatsko', 'hrvatska'],
+            'czech republic': ['czech republic', 'czechia', 'ceska republika', 'tsjechie', 'tsjechie', 'tsechie', 'republique tcheque', 'repubblica ceca', 'republica checa', 'czechy'],
+            'hungary': ['hungary', 'magyarorszag', 'hongarije', 'ungarn', 'hongrie', 'hungria', 'wegry', 'węgry', 'madarsko'],
+            'slovakia': ['slovakia', 'slovak', 'slovensko', 'slowakije', 'slowakei', 'slovaquie', 'slovacchia', 'eslovaquia'],
+            'lithuania': ['lithuania', 'lietuva', 'litouwen', 'litauen', 'lituanie', 'lituania', 'litwa', 'litva'],
+            'luxembourg': ['luxembourg', 'luxemburg', 'luxemburgo', 'luksemburg']
+        };
+
+        for (const [country, aliases] of Object.entries(countryAliases)) {
+            if (aliases.some(alias => normalized.includes(alias))) {
+                return country;
+            }
         }
 
         // Fallback: collapse multiple spaces into single space
-        return s.replace(/\s+/g, ' ');
+        return normalized.replace(/\s+/g, ' ');
     }
 
     /* =========================
@@ -211,75 +273,179 @@
             updateStatusMessage('A popup window has been opened to automatically solve the captcha. Please complete the captcha in the popup window. The script will automatically detect when it\'s solved and continue processing. If you do not see a popup, check your browser\'s popup settings.');
         }
         // Start checking if captcha is solved
-        startCaptchaCheck();
+        startCaptchaCheck('1');
         return true;
     }
 
-    function startCaptchaCheck() {
-        // Clear any existing interval
-        if (captchaCheckInterval) {
-            clearInterval(captchaCheckInterval);
+    function addUniqueProbeItemId(ids, itemId) {
+        const id = String(itemId || '').trim();
+        if (/^\d+$/.test(id) && !ids.includes(id)) {
+            ids.push(id);
         }
-        
-        captchaCheckInterval = setInterval(async () => {
+    }
+
+    function collectApiProbeItemIds(primaryItemId = '') {
+        const ids = [];
+        addUniqueProbeItemId(ids, primaryItemId);
+
+        queue.slice(0, 8).forEach(item => addUniqueProbeItemId(ids, item && item.id));
+
+        const knownIds = Array.from(processedItems.keys()).slice(-8);
+        knownIds.forEach(itemId => addUniqueProbeItemId(ids, itemId));
+
+        return ids;
+    }
+
+    function clearCaptchaCheckTimer() {
+        if (captchaCheckInterval) {
+            clearTimeout(captchaCheckInterval);
+            captchaCheckInterval = null;
+        }
+    }
+
+    function startCaptchaCheck(probeItemId = '1', immediate = false) {
+        clearCaptchaCheckTimer();
+
+        captchaProbeItemIds = collectApiProbeItemIds(probeItemId);
+        if (captchaProbeItemIds.length === 0) {
+            addUniqueProbeItemId(captchaProbeItemIds, probeItemId || '1');
+        }
+        captchaProbeIndex = 0;
+        captchaRetryAttempt = 0;
+
+        const scheduleNextCheck = (delay) => {
+            clearCaptchaCheckTimer();
+            captchaCheckInterval = setTimeout(runCheck, delay);
+        };
+
+        const runCheck = async () => {
             try {
+                const probeItemIdToCheck = captchaProbeItemIds[captchaProbeIndex % captchaProbeItemIds.length] || '1';
+                captchaProbeIndex++;
+                const safeProbeItemId = encodeURIComponent(probeItemIdToCheck);
+
                 // Try to fetch the API to see if captcha is solved
                 const response = await fetch(
-                    `https://${location.hostname}/api/v2/items/1/details`,
-                    { credentials: 'include' }
+                    `https://${location.hostname}/api/v2/items/${safeProbeItemId}/details`,
+                    {
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json, text/plain, */*' }
+                    }
                 );
 
-                // If we get a 200 immediately, captcha is solved; close popup right away
-                if (response.ok && response.status === 200) {
+                if (!(await isAccessBlockResponse(response))) {
+                    console.log('[Vinted Filter] API access restored.');
                     onCaptchaSolved();
                     return;
                 }
-                
-                // If we no longer get 403, captcha is solved
-                if (response.status !== 403) {
-                    const text = await response.text();
-                    try {
-                        let data = JSON.parse(text);
-                        // Handle array response: [{"code":104,...}]
-                        if (Array.isArray(data)) {
-                            data = data[0] || {};
-                        }
-                        // Check if we get the "not found" response or valid data (means captcha is solved)
-                        if (data.code === 104 || data.message_code === 'not_found' || data.item) {
-                            console.log('[Vinted Filter] Captcha solved! Response:', data);
-                            onCaptchaSolved();
-                            return;
-                        }
-                    } catch (parseError) {
-                        // If response is not JSON but status is OK, captcha might be solved
-                        if (response.ok) {
-                            console.log('[Vinted Filter] Captcha appears solved (non-JSON response)');
-                            onCaptchaSolved();
-                            return;
-                        }
-                        // Also check if the HTML response contains "message_code" (captcha solved)
-                        if (text.includes('message_code')) {
-                            console.log('[Vinted Filter] Captcha solved! Found message_code in HTML response');
-                            onCaptchaSolved();
-                            return;
-                        }
-                    }
-                }
             } catch (e) {
                 console.log('[Vinted Filter] Captcha check error:', e);
-                // Ignore errors, keep checking
             }
-        }, 1500); // Check every 1.5 seconds
+
+            captchaRetryAttempt++;
+            const retryDelay = API_RECOVERY_RETRY_DELAYS[Math.min(captchaRetryAttempt, API_RECOVERY_RETRY_DELAYS.length - 1)];
+            updateStatusMessage(`⚠️ API access paused. Retrying automatically in ${Math.round(retryDelay / 1000)}s...`);
+            scheduleNextCheck(retryDelay);
+        };
+
+        const firstDelay = immediate ? 0 : API_RECOVERY_RETRY_DELAYS[0];
+        scheduleNextCheck(firstDelay);
+    }
+
+    function getResponseHeader(response, name) {
+        try {
+            if (!response || !response.headers || typeof response.headers.get !== 'function') {
+                return '';
+            }
+            return response.headers.get(name) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async function getResponseText(response) {
+        try {
+            const readableResponse = response && typeof response.clone === 'function'
+                ? response.clone()
+                : response;
+
+            if (!readableResponse || typeof readableResponse.text !== 'function') {
+                return '';
+            }
+
+            return await readableResponse.text();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async function isAccessBlockResponse(response) {
+        if (!response || response.status !== 403) {
+            return false;
+        }
+
+        const cfMitigated = getResponseHeader(response, 'cf-mitigated').toLowerCase();
+        if (cfMitigated.includes('challenge')) {
+            return true;
+        }
+
+        const contentType = getResponseHeader(response, 'content-type').toLowerCase();
+        const text = (await getResponseText(response)).toLowerCase();
+
+        if (!text) {
+            return false;
+        }
+
+        if (contentType.includes('text/html')) {
+            return text.includes('challenge-platform') ||
+                   text.includes('_cf_chl_opt') ||
+                   text.includes('cf-chl') ||
+                   text.includes('captcha') ||
+                   text.includes('enable javascript and cookies to continue');
+        }
+
+        return text.includes('captcha') ||
+               text.includes('cloudflare challenge') ||
+               text.includes('challenge_required');
+    }
+
+    async function isApiAccessBlocked(responseToInspect = null) {
+        if (responseToInspect) {
+            return isAccessBlockResponse(responseToInspect);
+        }
+
+        try {
+            const response = await fetch(
+                `https://${location.hostname}/api/v2/items/1/details`,
+                {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json, text/plain, */*' }
+                }
+            );
+            return isAccessBlockResponse(response);
+        } catch (e) {
+            console.warn('[Vinted Filter] API access probe failed:', e);
+            return false;
+        }
+    }
+
+    function markItemUnavailable(item, label = 'Unavailable') {
+        item.overlay.textContent = `⚠️ ${label}`;
+        item.overlay.style.background = 'linear-gradient(135deg, rgba(117,117,117,0.95) 0%, rgba(97,97,97,0.95) 100%)';
+        item.overlay.style.color = 'white';
+        item.overlay.style.borderColor = '#757575';
+        item.overlay.style.fontSize = '10px';
+        item.overlay.style.padding = '5px 9px';
     }
 
     function onCaptchaSolved() {
         // Stop checking
-        if (captchaCheckInterval) {
-            clearInterval(captchaCheckInterval);
-            captchaCheckInterval = null;
-        }
+        clearCaptchaCheckTimer();
 
         hasShownCaptchaAlert = false;
+        captchaProbeItemIds = [];
+        captchaProbeIndex = 0;
+        captchaRetryAttempt = 0;
         
         // Close popup - try multiple times to ensure it closes
         if (captchaPopup && !captchaPopup.closed) {
@@ -319,6 +485,23 @@
         setTimeout(() => {
             updateStatusMessage('Processing items...');
         }, 1500);
+    }
+
+    function retryApiAccessNow() {
+        clearCaptchaCheckTimer();
+
+        const probeIds = collectApiProbeItemIds(captchaProbeItemIds[0]);
+        const retryProbeItemId = probeIds[0] || captchaProbeItemIds[0] || '1';
+
+        isPausedForCaptcha = false;
+        const warningEl = document.getElementById('vinted-captcha-warning');
+        if (warningEl) {
+            warningEl.style.display = 'none';
+        }
+
+        updateStatusMessage('Retrying API access with visible items...');
+        startCaptchaCheck(retryProbeItemId, true);
+        setTimeout(processQueue, 0);
     }
 
     /* =========================
@@ -516,10 +699,10 @@
                             color: #856404;
                         ">
                             <span style="font-size: 20px;">⚠️</span>
-                            <span>Language Warning</span>
+                            <span>Locale Notice</span>
                         </div>
                         <p style="margin: 0; color: #856404; line-height: 1.5;">
-                            This script only works when Vinted is set to <strong>English</strong>. Please change your language to English in your Vinted settings to use this filter.
+                            Country names are normalized automatically for supported Vinted locales.
                         </p>
                     </div>
 
@@ -552,11 +735,24 @@
                             color: #c62828;
                         ">
                             <span style="font-size: 20px;">🔓</span>
-                            <span>Auto-Solving Captcha</span>
+                            <span>API Access Paused</span>
                         </div>
                         <p style="margin: 0; color: #555; line-height: 1.5;">
-                            A popup window has been opened to automatically solve the captcha. Please complete the captcha in the popup window. The script will automatically detect when it's solved and continue processing.
+                            Vinted returned a captcha or access block. The script will retry real item requests automatically and resume when access is restored.
                         </p>
+                        <button id="vinted-api-retry-now" style="
+                            margin-top: 12px;
+                            width: 100%;
+                            padding: 9px;
+                            background: #c62828;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: background 0.2s;
+                        " onmouseover="this.style.background='#ad2020'" onmouseout="this.style.background='#c62828'" title="Retry API access using visible Vinted items">↻ Retry API now</button>
                     </div>
 
                     <div style="display: flex; gap: 8px; margin-top: 12px;">
@@ -820,7 +1016,7 @@
                     padding-top: 8px;
                     border-top: 1px solid ${darkMode ? '#444' : '#eee'};
                 ">
-                    v1.4.7 • Jan 29, 2026
+                    v1.4.14 • Jun 26, 2026
                 </div>
             </div>
         `;
@@ -1026,6 +1222,12 @@
                 updateStatusMessage('Stats reset!');
             }
         });
+
+        const apiRetryButton = document.getElementById('vinted-api-retry-now');
+        if (apiRetryButton) {
+            apiRetryButton.addEventListener('click', retryApiAccessNow);
+        }
+
         const countryCheckboxes = document.querySelectorAll('#vinted-country-checkboxes input[type="checkbox"]');
         countryCheckboxes.forEach(checkbox => {
             checkbox.checked = includedCountries.includes(normalizeCountryName(checkbox.id.replace('include-', '').replace(/-/g, ' ')));
@@ -1382,10 +1584,23 @@ const countryKey = cachedData.country; // normalized
 
         try {
             const response = await fetch(
-                `https://${location.hostname}/api/v2/items/${item.id}/details`
+                `https://${location.hostname}/api/v2/items/${item.id}/details`,
+                {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json, text/plain, */*' }
+                }
             );
 
             if (response.status === 403) {
+                const apiBlocked = await isApiAccessBlocked(response);
+                if (!apiBlocked) {
+                    console.warn(`[Vinted Filter] Item ${item.id} returned 403 without a captcha/access-block challenge. Skipping item.`);
+                    markItemUnavailable(item);
+                    updateQueueStatus();
+                    setTimeout(() => (isProcessing = false), 100);
+                    return;
+                }
+
                 isPausedForCaptcha = true;
                 queue.unshift(item);
                 const warningEl = document.getElementById('vinted-captcha-warning');
@@ -1393,9 +1608,9 @@ const countryKey = cachedData.country; // normalized
                     warningEl.style.display = 'block';
                 }
                 
-                // Automatically open captcha popup
-                console.log('[Vinted Filter] Captcha detected (403). Opening popup automatically...');
-                openCaptchaPopup();
+                console.warn('[Vinted Filter] Captcha or access block detected (403). Pausing without opening a popup automatically.');
+                updateStatusMessage('⚠️ API access paused. Retrying real item requests automatically...');
+                startCaptchaCheck(item.id);
                 
                 isProcessing = false;
                 return;
@@ -1574,93 +1789,16 @@ const countryKey = cachedData.country; // normalized
 
     function checkLanguage() {
         const warningEl = document.getElementById('vinted-language-warning');
-        if (!warningEl) {
-            // If menu doesn't exist yet, wait a bit and check again
-            return false;
+        if (warningEl) {
+            warningEl.style.display = 'none';
         }
-
-        let isEnglish = false;
-
-        // Method 0: Check <html lang="..."> attribute first (preferred)
-        try {
-            const htmlLang = document.documentElement && document.documentElement.getAttribute && document.documentElement.getAttribute('lang');
-            if (htmlLang && htmlLang.toLowerCase().startsWith('en')) {
-                isEnglish = true;
-            }
-        } catch (e) {
-            // ignore
+        if (isWaitingForEnglish) {
+            isWaitingForEnglish = false;
+            updateStatusMessage('Ready to filter items...');
         }
+        englishCheckComplete = true;
 
-        // Method 1: Check meta tags for content="en" or content starting with en
-        if (!isEnglish) {
-            try {
-                const metas = Array.from(document.querySelectorAll('meta'));
-                for (const m of metas) {
-                    const content = (m.getAttribute('content') || '').toLowerCase().trim();
-                    if (!content) continue;
-
-                    // Common formats: "en", "en-US", "en; charset=utf-8"
-                    if (content === 'en' || content.startsWith('en-') || content.split(/[;,]/)[0].trim() === 'en') {
-                        isEnglish = true;
-                        break;
-                    }
-
-                    const name = (m.getAttribute('name') || '').toLowerCase();
-                    const http = (m.getAttribute('http-equiv') || '').toLowerCase();
-                    if ((name === 'content-language' || http === 'content-language' || name === 'language' || name === 'locale') && content.startsWith('en')) {
-                        isEnglish = true;
-                        break;
-                    }
-                }
-            } catch (e) {
-                // ignore DOM errors
-            }
-        }
-
-        // Method 2: Check URL parameter as a fallback (e.g., ?locale=en)
-        if (!isEnglish) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const locale = urlParams.get('locale');
-            if (locale && locale.toLowerCase().startsWith('en')) {
-                isEnglish = true;
-            }
-        }
-
-        // Handle language state
-        if (isEnglish) {
-            // English detected
-            if (isWaitingForEnglish) {
-                isWaitingForEnglish = false;
-                englishCheckComplete = true;
-                warningEl.style.display = 'none';
-                updateStatusMessage('✓ English detected. Starting to process items...');
-
-                // Clear any existing items and restart fresh
-                processedItems.clear();
-                queue.length = 0;
-
-                // Small delay before resuming
-                setTimeout(() => {
-                    updateStatusMessage('Ready to filter items...');
-                }, 1500);
-            } else {
-                // Already in English, just hide warning
-                warningEl.style.display = 'none';
-                if (!englishCheckComplete) {
-                    englishCheckComplete = true;
-                }
-            }
-        } else {
-            // Not English - show warning
-            if (!isWaitingForEnglish) {
-                isWaitingForEnglish = true;
-                englishCheckComplete = false;
-                updateStatusMessage('⚠️ Please switch to English to use this filter');
-            }
-            warningEl.style.display = 'block';
-        }
-
-        return isEnglish;
+        return true;
     }
 
     // Track navigation changes (SPA navigation)
@@ -1669,7 +1807,7 @@ const countryKey = cachedData.country; // normalized
         const url = location.href;
         if (url !== lastUrl) {
             lastUrl = url;
-            // Reset English check on navigation
+            // Reset locale readiness on navigation if an older warning state was active
             if (isWaitingForEnglish) {
                 englishCheckComplete = false;
             }
@@ -1753,10 +1891,10 @@ const countryKey = cachedData.country; // normalized
 
     injectStyles();
 
-    // Initial language check on load
+    // Initial locale readiness check on load
     function initialLanguageCheck() {
-        const isEnglish = checkLanguage();
-        if (!isEnglish) {
+        const isLocaleReady = checkLanguage();
+        if (!isLocaleReady) {
             isWaitingForEnglish = true;
             englishCheckComplete = false;
         } else {
@@ -1770,6 +1908,6 @@ const countryKey = cachedData.country; // normalized
     setInterval(createMenu, 1000);
     setInterval(scanItems, 2000);
     setInterval(processQueue, 200);
-    setInterval(checkLanguage, 2000); // Check language every 2 seconds
+    setInterval(checkLanguage, 2000); // Keep locale state ready during SPA updates
 
 })();
