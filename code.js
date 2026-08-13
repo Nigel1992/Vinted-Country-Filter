@@ -129,7 +129,7 @@
     USER INFORMATION (Greasy Fork transparency):
 
     - This script retrieves country and city information via Vinted’s own API:
-      /api/v2/items/{id}/details
+      /api/v2/catalog/items/{id}/details
     - Filtering is purely visual (opacity and grayscale) and does not affect
       Vinted search results or server-side filters.
     - The script may temporarily pause if Vinted returns a 403 (captcha)
@@ -249,20 +249,20 @@
     ========================== */
 
     function openCaptchaPopup() {
-        const apiUrl = `https://${location.hostname}/api/v2/items/1/details`;
-        
+        const apiUrl = `https://${location.hostname}/api/v2/catalog/items/1/details`;
+
         // Close existing popup if any
         if (captchaPopup && !captchaPopup.closed) {
             captchaPopup.close();
         }
-        
+
         // Open small popup window
         captchaPopup = window.open(
             apiUrl,
             'VintedCaptcha',
             'width=500,height=600,scrollbars=yes,resizable=yes'
         );
-        
+
         // Check if popup was blocked
         if (!captchaPopup || captchaPopup.closed || typeof captchaPopup.closed === 'undefined') {
             console.warn('[Vinted Filter] Popup was blocked by browser. Please allow popups for this site and refresh the page.');
@@ -326,7 +326,7 @@
 
                 // Try to fetch the API to see if captcha is solved
                 const response = await fetch(
-                    `https://${location.hostname}/api/v2/items/${safeProbeItemId}/details`,
+                    `https://${location.hostname}/api/v2/catalog/items/${safeProbeItemId}/details`,
                     {
                         credentials: 'include',
                         headers: { 'Accept': 'application/json, text/plain, */*' }
@@ -416,7 +416,7 @@
 
         try {
             const response = await fetch(
-                `https://${location.hostname}/api/v2/items/1/details`,
+                `https://${location.hostname}/api/v2/catalog/items/1/details`,
                 {
                     credentials: 'include',
                     headers: { 'Accept': 'application/json, text/plain, */*' }
@@ -446,7 +446,7 @@
         captchaProbeItemIds = [];
         captchaProbeIndex = 0;
         captchaRetryAttempt = 0;
-        
+
         // Close popup - try multiple times to ensure it closes
         if (captchaPopup && !captchaPopup.closed) {
             console.log('[Vinted Filter] Attempting to close captcha popup...');
@@ -455,7 +455,7 @@
             } catch (e) {
                 console.warn('[Vinted Filter] Error closing popup:', e);
             }
-            
+
             // Retry closing after a short delay in case it didn't work immediately
             setTimeout(() => {
                 if (captchaPopup && !captchaPopup.closed) {
@@ -471,16 +471,16 @@
         } else {
             captchaPopup = null;
         }
-        
+
         // Resume processing
         isPausedForCaptcha = false;
         const warningEl = document.getElementById('vinted-captcha-warning');
         if (warningEl) {
             warningEl.style.display = 'none';
         }
-        
+
         updateStatusMessage('✅ Captcha solved! Resuming...');
-        
+
         // Small delay before resuming
         setTimeout(() => {
             updateStatusMessage('Processing items...');
@@ -1253,11 +1253,11 @@
         filterToggle.addEventListener('change', () => {
             isFilterEnabled = filterToggle.checked;
             sessionStorage.setItem('vinted_filter_enabled', isFilterEnabled);
-            
+
             const slider = document.getElementById('vinted-toggle-slider');
             const knob = slider.querySelector('span');
             const filterOptions = document.getElementById('vinted-filter-options');
-            
+
             if (isFilterEnabled) {
                 slider.style.backgroundColor = '#007782';
                 knob.style.left = '27px';
@@ -1584,7 +1584,7 @@ const countryKey = cachedData.country; // normalized
 
         try {
             const response = await fetch(
-                `https://${location.hostname}/api/v2/items/${item.id}/details`,
+                `https://${location.hostname}/api/v2/catalog/items/${item.id}/details`,
                 {
                     credentials: 'include',
                     headers: { 'Accept': 'application/json, text/plain, */*' }
@@ -1607,11 +1607,11 @@ const countryKey = cachedData.country; // normalized
                 if (warningEl) {
                     warningEl.style.display = 'block';
                 }
-                
+
                 console.warn('[Vinted Filter] Captcha or access block detected (403). Pausing without opening a popup automatically.');
                 updateStatusMessage('⚠️ API access paused. Retrying real item requests automatically...');
                 startCaptchaCheck(item.id);
-                
+
                 isProcessing = false;
                 return;
             }
@@ -1711,17 +1711,17 @@ const countryKey = cachedData.country; // normalized
             item.element.style.opacity = '1';
             item.element.style.filter = 'none';
             item.element.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
-            
+
             // Remove the country overlay
             if (item.overlay && item.overlay.parentNode) {
                 item.overlay.remove();
             }
         });
-        
+
         // Clear processed items and queue
         processedItems.clear();
         queue.length = 0;
-        
+
         // Update counters
         const matchNumberEl = document.getElementById('vinted-match-number');
         const totalNumberEl = document.getElementById('vinted-total-number');
@@ -1731,7 +1731,7 @@ const countryKey = cachedData.country; // normalized
         if (totalNumberEl) totalNumberEl.textContent = '-';
         // No duplicates counter to reset
         if (queueNumberEl) queueNumberEl.textContent = '0';
-        
+
         // Hide progress bar
         const progressContainer = document.getElementById('vinted-progress-bar-container');
         if (progressContainer) progressContainer.style.display = 'none';
