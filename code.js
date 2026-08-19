@@ -39,8 +39,8 @@
     // Check if user is logged in to Vinted
 
     function isUserLoggedIn() {
-        // Check for the presence of <figure class="header-avatar">, which only appears when logged in
-        return !!document.querySelector('figure.header-avatar');
+        // Vinted's CSS-module hash changes, but the class name consistently includes "header-avatar".
+        return !!document.querySelector('figure[class*="header-avatar"]');
     }
 
     // Skip login check if captcha is being shown (isPausedForCaptcha or captcha warning visible)
