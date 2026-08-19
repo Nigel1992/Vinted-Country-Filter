@@ -1,4 +1,4 @@
-## Vinted Country & City Filter (Client-side) v1.4.1.1
+## Vinted Country & City Filter (Client-side) v1.4.8
 
 ![Screenshot](https://greasyfork.org/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsiZGF0YSI6MjAyMTI5LCJwdXIiOiJibG9iX2lkIn19--e0c7cd180b6a3a98fab91859d3e33e859e744675/Screenshot_2026-01-04_22-44-33-min%20(1).png?locale=nl)
 
@@ -73,6 +73,9 @@ When **filtering is disabled**, **no items are hidden or de-emphasized**, and th
 - ⌨️ **Keyboard shortcut** — Press Alt+V to toggle menu
 
 ---
+
+### New in v1.4.8
+- 🔐 **Reliable login detection** — Recognizes Vinted's changing CSS-module avatar class, so logged-in users are not incorrectly asked to sign in.
 
 ### New in v1.4.1.1
 - 🔧 **Click fix** — Items with duplicate seller badges are now fully clickable

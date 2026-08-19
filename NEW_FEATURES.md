@@ -1,5 +1,9 @@
 # 🎉 New Features Added (v1.3.0+)
 
+## New in v1.4.8
+
+- **Reliable login detection** — The script now detects the stable `header-avatar` portion of Vinted's CSS-module avatar class, preventing false login warnings when its generated class hash changes.
+
 ## New in v1.4.2
 
 - **Tabbed Main/Settings layout** — cleaner separation of controls with active tab remembered across sessions.

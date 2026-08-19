@@ -2,7 +2,7 @@
 
 # 🌍 Vinted Geolocator
 
-![Version](https://img.shields.io/badge/version-1.4.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.4.8-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![JavaScript](https://img.shields.io/badge/javascript-ES6+-yellow?style=for-the-badge&logo=javascript&logoColor=white)
 
@@ -58,6 +58,10 @@
 - **Language**: Set Vinted to **English** for the script to work correctly
 - **Rate Limits**: The script respects Vinted's API limits.
 - **Visual Only**: Filtering is purely visual — it doesn't affect Vinted's search results
+
+## Recent Update
+
+- **v1.4.8**: Fixed logged-in user detection to accommodate Vinted's changing CSS-module avatar class names.
 
 ## 🔒 Privacy & Security
 

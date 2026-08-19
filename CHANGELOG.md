@@ -1,3 +1,8 @@
+## [1.4.8] - 2026-08-19
+
+### Fixed
+- Restored logged-in user detection after Vinted changed the avatar class to a CSS-module-generated name. The check now matches the stable `header-avatar` portion of the class name.
+
 ## [1.4.7] - 2026-01-29
 
 ### Changed
