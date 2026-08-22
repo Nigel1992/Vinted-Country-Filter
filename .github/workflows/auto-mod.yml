@@ -1,0 +1,36 @@
+name: Comment Moderation Check
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+jobs:
+  moderate:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Analyze with Gemini API
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body }}
+          COMMENT_NODE_ID: ${{ github.event.comment.node_id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SAFE_TEXT=$(echo "$COMMENT_BODY" | jq -aRs .)
+          PROMPT="Analyze the following text posted on GitHub. CONTEXT: The repository owner openly acknowledges using AI to build this project. Simply mentioning that AI is used is fine. CRITERIA FOR FLAGGING: Flag if it contains: 1. Condescending remarks, dismissive language, or insults targeting the developer's competence. 2. Toxic or hostile personal attacks. If it meets these criteria, reply strictly with [FLAGGED]. Otherwise, reply with [OK]. Text: $SAFE_TEXT"
+          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{ contents: [{ parts: [{ text: $prompt }] }] }')
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$GEMINI_API_KEY" -H "Content-Type: application/json" -d "$PAYLOAD")
+          RESULT=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+          if [[ "$RESULT" == *"[FLAGGED]"* ]]; then
+            if [ -n "$COMMENT_NODE_ID" ]; then
+              gh api graphql -f query='mutation($input: MinimizeCommentInput!) { minimizeComment(input: $input) { minimizedComment { isMinimized } } }' -f input[subjectId]="$COMMENT_NODE_ID" -f input[classifier]="ABUSE"
+              gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "⚠️ **Moderation Notice:** A comment in this thread has been hidden automatically for violating community guidelines regarding personal attacks or condescension."
+            else
+              gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "⚠️ **Moderation Notice:** This issue has been closed and locked automatically for violating community guidelines regarding personal attacks or condescension."
+              gh issue close "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --reason "not planned"
+              gh issue lock "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --reason "too_heated"
+            fi
+          fi
