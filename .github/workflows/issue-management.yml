@@ -1,50 +1,45 @@
 name: Issue Management
+
 on:
   issues:
     types: [opened]
   schedule:
-    - cron: '23 2 * * *'
-  workflow_dispatch:
-permissions:
-  contents: read
-concurrency:
-  group: issue-management-${{ github.event.issue.number || github.event_name }}
-  cancel-in-progress: false
+    - cron: '0 0 * * *'
+
 jobs:
   welcome:
-    if: github.event_name == 'issues' && github.event.issue.title != 'Community & Conduct'
+    if: github.event_name == 'issues' && github.event.action == 'opened'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     permissions:
       issues: write
-      pull-requests: write
     steps:
-      - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3
+      - uses: actions/first-interaction@v1
         with:
-          repo-token: ${{ github.token }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           issue-message: |
-            👋 Welcome, and thanks for opening your first issue!
+            👋 **Welcome and thanks for opening your first issue!**
+            
+            We appreciate you taking the time to contribute or report a problem. Someone will review this as soon as possible. In the meantime, please make sure you've included all relevant details (like logs, steps to reproduce, or environment info).
 
-            Constructive criticism and suggestions are welcome. Please include the relevant version, environment, steps to reproduce, and logs where applicable. Keep feedback focused on the project and treat other people respectfully.
   stale:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     permissions:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10
+      - uses: actions/stale@v9
         with:
-          repo-token: ${{ github.token }}
-          debug-only: ${{ github.event_name == 'workflow_dispatch' }}
           days-before-stale: 30
           days-before-close: 7
-          stale-issue-label: stale
-          exempt-issue-labels: community,keep-open,pinned,security
+          stale-issue-label: 'stale'
           stale-issue-message: |
-            This issue has been inactive for 30 days and is marked as stale. It will close in 7 days without further activity. If it is still relevant, please leave an update.
+            ⏳ **This issue has been marked as stale** because it has been inactive for 30 days. 
+            
+            It will automatically close in **7 days** if no further activity occurs. If this is still relevant, please leave a comment or update!
           close-issue-message: |
-            Closed after a further 7 days without activity. If this is still relevant, please add an update or open a new issue with current details.
+            🔒 **Closed due to inactivity.** 
+            
+            This issue was automatically closed because it remained inactive. Feel free to open a new issue if you need further assistance.
           days-before-pr-stale: -1
           days-before-pr-close: -1
