@@ -1,0 +1,16 @@
+name: Ensure issues are posted in English
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+  contents: read
+jobs:
+  translate-to-english:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dromara/issues-translate-action@v2.8
+        with:
+          BOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_MODIFY_TITLE: true
+          CUSTOM_BOT_NOTE: "@${{ github.event.issue.user.login }} This issue was not posted in English. It has been translated to English automatically. Please post in English only next time on any of my repositories."
