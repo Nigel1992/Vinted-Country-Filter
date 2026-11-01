@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - run: pip install --quiet deep-translator langdetect
+      - run: pip install --quiet langdetect
       - name: Translate non-English issue to English
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -21,7 +21,7 @@ jobs:
           AUTHOR: ${{ github.event.issue.user.login }}
         run: |
           python3 - <<'PY'
-          import os, json, urllib.request
+          import os, json, urllib.request, urllib.parse, time
 
           token = os.environ['GITHUB_TOKEN']
           repo = os.environ['REPO']
@@ -38,14 +38,16 @@ jobs:
                   body = json.dumps(data).encode()
                   req.add_header('Content-Type', 'application/json')
                   req.data = body
-              try:
-                  with urllib.request.urlopen(req) as resp:
-                      return resp.status, json.loads(resp.read())
-              except urllib.error.HTTPError as e:
-                  print('HTTPError', e.code, e.read().decode()[:500])
-                  raise
+              with urllib.request.urlopen(req) as resp:
+                  raw = resp.read()
+                  return resp.status, (json.loads(raw) if raw else {})
 
-          status, issue = api('GET', f'/repos/{repo}/issues/{num}')
+          try:
+              status, issue = api('GET', f'/repos/{repo}/issues/{num}')
+          except Exception as e:
+              print('Failed to fetch issue:', e)
+              raise SystemExit(0)
+
           title = issue.get('title') or ''
           body = issue.get('body') or ''
 
@@ -59,23 +61,84 @@ jobs:
               except LangDetectException:
                   return True
 
-          if is_english(title) and is_english(body):
+          combined = (title + ' ' + body).strip()
+          if is_english(combined):
               print('Already English, skipping.')
               raise SystemExit(0)
 
-          from deep_translator import GoogleTranslator
-          translator = GoogleTranslator(source='auto', target='en')
-          new_title = translator.translate(title) if title.strip() else title
-          new_body = translator.translate(body) if body.strip() else body
+          # detect source language for translation
+          try:
+              src = detect(combined)
+          except LangDetectException:
+              src = 'auto'
+          if src == 'en':
+              src = 'auto'
 
-          if new_title == title and new_body == body:
+          def translate_text(text, src):
+              if not text.strip():
+                  return text
+              # chunk into <=400 char pieces
+              chunks = []
+              cur = ''
+              for line in text.split('\n'):
+                  if len(cur) + len(line) + 1 <= 400:
+                      cur += (line + '\n')
+                  else:
+                      if cur:
+                          chunks.append(cur)
+                      if len(line) > 400:
+                          for i in range(0, len(line), 400):
+                              chunks.append(line[i:i+400] + '\n')
+                          cur = ''
+                      else:
+                          cur = line + '\n'
+              if cur.strip():
+                  chunks.append(cur)
+
+              out = []
+              for c in chunks:
+                  q = urllib.parse.quote(c)
+                  url = f'https://api.mymemory.translated.net/get?q={q}&langpair={src}|en'
+                  translated = c
+                  for attempt in range(3):
+                      try:
+                          req = urllib.request.Request(url)
+                          with urllib.request.urlopen(req, timeout=30) as resp:
+                              data = json.loads(resp.read())
+                          t = data.get('responseData', {}).get('translatedText')
+                          if t:
+                              translated = t
+                          break
+                      except Exception as e:
+                          print('chunk translate error:', e)
+                          if attempt < 2:
+                              time.sleep(2)
+                  out.append(translated)
+                  time.sleep(0.5)
+              return ''.join(out)
+
+          try:
+              new_title = translate_text(title, src) if title.strip() else title
+              new_body = translate_text(body, src) if body.strip() else body
+          except Exception as e:
+              print('Translation failed:', e)
+              raise SystemExit(0)
+
+          if new_title.strip() == title.strip() and new_body.strip() == body.strip():
               print('No change after translation, skipping.')
               raise SystemExit(0)
 
-          api('PATCH', f'/repos/{repo}/issues/{num}', {'title': new_title, 'body': new_body})
-          print('Issue updated to English.')
+          try:
+              api('PATCH', f'/repos/{repo}/issues/{num}', {'title': new_title, 'body': new_body})
+              print('Issue updated to English.')
+          except Exception as e:
+              print('Failed to update issue:', e)
+              raise SystemExit(0)
 
-          comment = '@' + author + ' This issue was not posted in English. It has been translated to English automatically. Please post in English only next time on any of my repositories.'
-          api('POST', f'/repos/{repo}/issues/{num}/comments', {'body': comment})
-          print('Comment posted.')
+          try:
+              comment = '@' + author + ' This issue was not posted in English. It has been translated to English automatically. Please post in English only next time on any of my repositories.'
+              api('POST', f'/repos/{repo}/issues/{num}/comments', {'body': comment})
+              print('Comment posted.')
+          except Exception as e:
+              print('Failed to post comment:', e)
           PY
