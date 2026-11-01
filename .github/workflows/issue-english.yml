@@ -9,8 +9,73 @@ jobs:
   translate-to-english:
     runs-on: ubuntu-latest
     steps:
-      - uses: dromara/issues-translate-action@v2.8
+      - uses: actions/setup-python@v5
         with:
-          BOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IS_MODIFY_TITLE: true
-          CUSTOM_BOT_NOTE: "@${{ github.event.issue.user.login }} This issue was not posted in English. It has been translated to English automatically. Please post in English only next time on any of my repositories."
+          python-version: '3.x'
+      - run: pip install --quiet deep-translator langdetect
+      - name: Translate non-English issue to English
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          python3 - <<'PY'
+          import os, json, urllib.request
+
+          token = os.environ['GITHUB_TOKEN']
+          repo = os.environ['REPO']
+          num = os.environ['ISSUE_NUMBER']
+          author = os.environ['AUTHOR']
+
+          def api(method, path, data=None):
+              url = 'https://api.github.com' + path
+              req = urllib.request.Request(url, method=method)
+              req.add_header('Authorization', 'Bearer ' + token)
+              req.add_header('Accept', 'application/vnd.github+json')
+              req.add_header('X-GitHub-Api-Version', '2022-11-28')
+              if data is not None:
+                  body = json.dumps(data).encode()
+                  req.add_header('Content-Type', 'application/json')
+                  req.data = body
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      return resp.status, json.loads(resp.read())
+              except urllib.error.HTTPError as e:
+                  print('HTTPError', e.code, e.read().decode()[:500])
+                  raise
+
+          status, issue = api('GET', f'/repos/{repo}/issues/{num}')
+          title = issue.get('title') or ''
+          body = issue.get('body') or ''
+
+          from langdetect import detect, LangDetectException
+          def is_english(text):
+              text = text.strip()
+              if not text:
+                  return True
+              try:
+                  return detect(text) == 'en'
+              except LangDetectException:
+                  return True
+
+          if is_english(title) and is_english(body):
+              print('Already English, skipping.')
+              raise SystemExit(0)
+
+          from deep_translator import GoogleTranslator
+          translator = GoogleTranslator(source='auto', target='en')
+          new_title = translator.translate(title) if title.strip() else title
+          new_body = translator.translate(body) if body.strip() else body
+
+          if new_title == title and new_body == body:
+              print('No change after translation, skipping.')
+              raise SystemExit(0)
+
+          api('PATCH', f'/repos/{repo}/issues/{num}', {'title': new_title, 'body': new_body})
+          print('Issue updated to English.')
+
+          comment = '@' + author + ' This issue was not posted in English. It has been translated to English automatically. Please post in English only next time on any of my repositories.'
+          api('POST', f'/repos/{repo}/issues/{num}/comments', {'body': comment})
+          print('Comment posted.')
+          PY
