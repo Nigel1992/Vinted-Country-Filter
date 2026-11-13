@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  issues: read
+  issues: write
 
 jobs:
   notify:
@@ -23,11 +23,14 @@ jobs:
       DISCORD_WEBHOOK_SUGGESTIONS: ${{ secrets.DISCORD_WEBHOOK_SUGGESTIONS }}
       DISCORD_WEBHOOK_ANNOUNCEMENTS: ${{ secrets.DISCORD_WEBHOOK_ANNOUNCEMENTS }}
       DISCORD_WEBHOOK_UPDATES: ${{ secrets.DISCORD_WEBHOOK_UPDATES }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Post event to Discord
         shell: python
         run: |
-          import json, os, urllib.request
+          import json, os, re, urllib.error, urllib.request
+
+          MARKER = re.compile(r"<!-- discord-message: (issues|suggestions):(\d+) -->")
 
           def post(url, payload):
               req = urllib.request.Request(
@@ -41,6 +44,47 @@ jobs:
               )
               with urllib.request.urlopen(req, timeout=30) as r:
                   return r.status
+
+          def discord(url, payload, method="POST"):
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload).encode(),
+                  headers={
+                      "Content-Type": "application/json",
+                      "User-Agent": "NigelDiscordNotify/1.0 (+https://github.com/Nigel1992)",
+                  },
+                  method=method,
+              )
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  body = r.read()
+                  return json.loads(body) if body else {}
+
+          def github(method, path, payload=None):
+              req = urllib.request.Request(
+                  "https://api.github.com" + path,
+                  data=json.dumps(payload).encode() if payload is not None else None,
+                  headers={
+                      "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
+                      "Accept": "application/vnd.github+json",
+                      "User-Agent": "NigelDiscordNotify/1.0 (+https://github.com/Nigel1992)",
+                  },
+                  method=method,
+              )
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return json.loads(r.read() or b"null")
+
+          def find_marker(repo, number):
+              found = None
+              page = 1
+              while True:
+                  comments = github("GET", f"/repos/{repo}/issues/{number}/comments?per_page=100&page={page}")
+                  for c in comments:
+                      m = MARKER.search(c.get("body") or "")
+                      if m:
+                          found = (m.group(1), m.group(2))
+                  if len(comments) < 100:
+                      return found
+                  page += 1
 
           def field(name, value, inline=False):
               return {"name": name, "value": (value or "-")[:1000], "inline": inline}
@@ -56,10 +100,10 @@ jobs:
               labels = [l["name"] for l in issue.get("labels", [])]
               label_text = " ".join(labels).lower()
               suggestions = "feature" in label_text or "enhancement" in label_text
-              url = os.environ["DISCORD_WEBHOOK_SUGGESTIONS"] if suggestions else os.environ["DISCORD_WEBHOOK_ISSUES"]
+              channel = "suggestions" if suggestions else "issues"
               color = {"opened": 0x3498DB, "closed": 0x57F287, "reopened": 0xE67E22}.get(action, 0x95A5A6)
               payload = {"embeds": [{
-                  "title": f"[{action.upper()}] #{issue['number']} {issue['title']}",
+                  "title": f"[{action.upper()}] #{issue['number']} {issue['title']}"[:256],
                   "url": issue["html_url"],
                   "color": color,
                   "description": (issue.get("body") or "")[:1500],
@@ -69,6 +113,29 @@ jobs:
                   ],
                   "footer": {"text": repo},
               }]}
+
+              webhooks = {
+                  "issues": os.environ["DISCORD_WEBHOOK_ISSUES"],
+                  "suggestions": os.environ["DISCORD_WEBHOOK_SUGGESTIONS"],
+              }
+              number = issue["number"]
+              marker = None if action == "opened" else find_marker(repo, number)
+              if marker and webhooks.get(marker[0]):
+                  try:
+                      discord(webhooks[marker[0]].split("?")[0] + "/messages/" + marker[1], payload, "PATCH")
+                      print("Edited Discord message", marker[1])
+                      raise SystemExit(0)
+                  except urllib.error.HTTPError as e:
+                      print("Could not edit Discord message", marker[1], "-", e.code, e.read().decode(errors="replace")[:500])
+              if not webhooks[channel]:
+                  print("Discord webhook secret missing; skipping")
+                  raise SystemExit(0)
+              msg = discord(webhooks[channel].split("?")[0] + "?wait=true", payload)
+              github("POST", f"/repos/{repo}/issues/{number}/comments", {
+                  "body": f"<!-- discord-message: {channel}:{msg['id']} -->\nLinked to the Discord post.",
+              })
+              print("Posted Discord message", msg["id"])
+              raise SystemExit(0)
 
           elif event == "release":
               rel = data["release"]
