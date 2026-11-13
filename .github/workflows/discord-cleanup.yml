@@ -1,0 +1,107 @@
+name: Discord Cleanup
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      DISCORD_CHANNEL_IDS: '1559551385157115924,1559551390165237800'
+      DISCORD_WEBHOOK_ISSUES: ${{ secrets.DISCORD_WEBHOOK_ISSUES }}
+      DISCORD_WEBHOOK_SUGGESTIONS: ${{ secrets.DISCORD_WEBHOOK_SUGGESTIONS }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Close out Discord posts for closed issues
+        shell: python
+        run: |
+          import json, os, re, time, urllib.error, urllib.request
+
+          UA = "NigelDiscordCleanup/1.0 (+https://github.com/Nigel1992)"
+          TITLE = re.compile(r"^\[(OPENED|REOPENED|CLOSED)\] #(\d+) ")
+          repo_name = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ.get("DISCORD_BOT_TOKEN", "")
+          channels = [c.strip() for c in os.environ.get("DISCORD_CHANNEL_IDS", "").split(",") if c.strip()]
+          webhooks = {}
+          for u in (os.environ.get("DISCORD_WEBHOOK_ISSUES"), os.environ.get("DISCORD_WEBHOOK_SUGGESTIONS")):
+              if u:
+                  base = u.split("?")[0]
+                  webhooks[base.rstrip("/").split("/")[-2]] = base
+
+          if not token or not channels or not webhooks:
+              print("DISCORD_BOT_TOKEN, channel IDs or webhook secrets missing; skipping")
+              raise SystemExit(0)
+
+          def call(method, url, payload=None, headers=None):
+              h = {"User-Agent": UA, "Content-Type": "application/json"}
+              h.update(headers or {})
+              req = urllib.request.Request(url, data=json.dumps(payload).encode() if payload is not None else None, headers=h, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      body = r.read()
+                      return r.status, (json.loads(body) if body else None)
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode(errors="replace")[:300]
+
+          def github_state(number):
+              code, data = call("GET", f"https://api.github.com/repos/{repo_name}/issues/{number}", None, {
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
+              })
+              return data.get("state") if code == 200 and isinstance(data, dict) else None
+
+          def messages(channel):
+              before = None
+              for _ in range(20):
+                  path = f"https://discord.com/api/v10/channels/{channel}/messages?limit=100" + (f"&before={before}" if before else "")
+                  code, batch = call("GET", path, None, {"Authorization": "Bot " + token})
+                  if code != 200 or not batch:
+                      print("Could not read channel", channel, code, batch)
+                      return
+                  for m in batch:
+                      yield m
+                  before = batch[-1]["id"]
+                  if len(batch) < 100:
+                      return
+                  time.sleep(1)
+
+          changed = skipped = 0
+          for channel in channels:
+              for m in messages(channel):
+                  embeds = m.get("embeds") or []
+                  if not embeds:
+                      continue
+                  embed = embeds[0]
+                  match = TITLE.match(embed.get("title") or "")
+                  if not match or match.group(1) == "CLOSED":
+                      continue
+                  if (embed.get("footer") or {}).get("text") != repo_name:
+                      continue
+                  base = webhooks.get(m.get("webhook_id") or "")
+                  if not base:
+                      skipped += 1
+                      continue
+                  status, number = match.group(1), match.group(2)
+                  if github_state(number) != "closed":
+                      continue
+
+                  edited = dict(embed)
+                  edited["title"] = TITLE.sub(f"[CLOSED] #{number} ", embed["title"], count=1)
+                  edited["color"] = 0x57F287
+                  code, _ = call("PATCH", f"{base}/messages/{m['id']}", {"embeds": [edited]})
+                  if code in (200, 204):
+                      changed += 1
+                      print("Closed out #" + number)
+                  else:
+                      print("Failed for #" + number, "code", code)
+                  time.sleep(1.2)
+
+          print(f"Edited {changed}, skipped {skipped}")
