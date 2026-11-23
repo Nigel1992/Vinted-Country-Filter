@@ -28,67 +28,9 @@
 - **🎨 Sleek UI** — Minimalist floating panel that stays out of your way
 - **⚡ Lightweight** — Pure JavaScript, no external dependencies
 
-## 🛒 Supported Vinted Sites
+## 💖 Support the Project
 
-| Site | URL |
-|------|-----|
-| 🇳🇱 Netherlands | vinted.nl |
-| 🇧🇪 Belgium | vinted.be |
-| 🇫🇷 France | vinted.fr |
-| 🇩🇪 Germany | vinted.de |
-| 🇪🇸 Spain | vinted.es |
-| 🇮🇹 Italy | vinted.it |
-| 🇸🇪 Sweden | vinted.se |
+I build this project in my free time and don't need donations for myself. If you'd like to give something back, I'd kindly ask you to donate to a charity of your choice instead — they need it far more than I do. If you still prefer to support me directly in private, thank you so much; it's genuinely appreciated.
 
-## 📦 Installation
-
-1. Install a userscript manager:
-   - [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari)
-   - [Violentmonkey](https://violentmonkey.github.io/) (Chrome, Firefox, Edge)
-   - [Greasemonkey](https://www.greasespot.net/) (Firefox)
-
-2. **[Click here to install the script](https://greasyfork.org/en/scripts/559753-vinted-country-city-filter-client-side)** from Greasy Fork
-
-   *Or* create a new script and paste the contents of `code.js`
-
-3. Visit any supported Vinted site and start browsing!
-
-## 🎯 How It Works
-
-1. The script scans visible items on the page
-2. For each item, it first checks cached location data, then fetches from Vinted's API if needed
-3. Location data is cached forever to avoid repeated API calls
-4. Country flags are added to item cards
-5. Use the floating panel to filter by your preferred country
-6. Non-matching items fade out, keeping your focus on relevant listings
-
-## ⚠️ Important Notes
-
-- **Language**: Set Vinted to **English** for the script to work correctly
-- **Rate Limits**: The script respects Vinted's API limits.
-- **Visual Only**: Filtering is purely visual — it doesn't affect Vinted's search results
-
-## Recent Update
-
-- **v1.4.8**: Fixed logged-in user detection to accommodate Vinted's changing CSS-module avatar class names.
-
-## 🔒 Privacy & Security
-
-- ✅ No data sent to third parties
-- ✅ No tracking or analytics
-- ✅ No ads or miners
-- ✅ Open source — inspect the code yourself!
-
-## 📄 License
-
-MIT License — feel free to use, modify, and share!
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/Nigel1992">Nigel1992</a>
-</p>
-
-## Support This Project
-
-Support this project! All donations go towards your chosen charity. You can pick any charity you'd like, and I will ensure the funds are sent their way. Please note that standard payment processing fees (Ko-fi & PayPal) will be deducted from the total. As a thank you, your name will be listed as a supporter/donor in this project. Feel free to email me at thedjskywalker@gmail.com for proof of the donation or to let me know which charity you've selected!
+[![Ko-Fi](https://img.shields.io/badge/Ko--Fi-Support%20me-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nigel1992)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=KYV9ARF99ZSCE)
